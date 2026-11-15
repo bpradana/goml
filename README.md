@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/logo.svg" width="88" height="88" alt="goml logo">
+
 # goml
 
 **CPU-first numerical computing and machine learning, written in Go.**
