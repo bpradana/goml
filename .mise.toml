@@ -1,0 +1,307 @@
+[settings]
+lockfile = true
+
+[tools]
+go = "1.27.3"
+"golangci-lint" = "2.15.0"
+"go:golang.org/x/tools/cmd/goimports" = "latest"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
+"go:github.com/sonatype-nexus-community/nancy" = "latest"
+"go:go.uber.org/mock/mockgen" = "latest"
+
+[tasks."build"]
+description = "build all modules"
+run = [
+  { task = "build:simdops" },
+  { task = "build:tensor" },
+  { task = "build:nn" }
+]
+
+[tasks."build:simdops"]
+description = "build simdops"
+dir = "simdops"
+run = "go build ./..."
+
+[tasks."build:tensor"]
+description = "build tensor"
+dir = "tensor"
+run = "go build ./..."
+
+[tasks."build:nn"]
+description = "build nn"
+dir = "nn"
+run = "go build ./..."
+
+[tasks."build:portable"]
+description = "Cross-compile Linux amd64 and arm64 without CGo, with and without SIMD"
+run = [
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./simdops/... ./tensor/... ./nn/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./simdops/... ./tensor/... ./nn/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/..."
+]
+
+[tasks."test"]
+description = "test all modules"
+run = [
+  { task = "test:simdops" },
+  { task = "test:tensor" },
+  { task = "test:nn" }
+]
+
+[tasks."test:simdops"]
+description = "test simdops"
+dir = "simdops"
+run = "go test ./..."
+
+[tasks."test:tensor"]
+description = "test tensor"
+dir = "tensor"
+run = "go test ./..."
+
+[tasks."test:nn"]
+description = "test nn"
+dir = "nn"
+run = "go test ./..."
+
+[tasks."lint"]
+description = "lint all modules"
+run = [
+  { task = "lint:simdops" },
+  { task = "lint:tensor" },
+  { task = "lint:nn" }
+]
+
+[tasks."lint:simdops"]
+description = "lint simdops"
+dir = "simdops"
+run = "golangci-lint run ./..."
+
+[tasks."lint:tensor"]
+description = "lint tensor"
+dir = "tensor"
+run = "golangci-lint run ./..."
+
+[tasks."lint:nn"]
+description = "lint nn"
+dir = "nn"
+run = "golangci-lint run ./..."
+
+[tasks."bench"]
+description = "bench all modules"
+run = [
+  { task = "bench:simdops" },
+  { task = "bench:tensor" },
+  { task = "bench:nn" }
+]
+
+[tasks."bench:simdops"]
+description = "bench simdops"
+dir = "simdops"
+run = "go test -run '^$' -bench=. -benchmem ./..."
+
+[tasks."bench:tensor"]
+description = "bench tensor"
+dir = "tensor"
+run = "go test -run '^$' -bench=. -benchmem ./..."
+
+[tasks."bench:nn"]
+description = "bench nn"
+dir = "nn"
+run = "go test -run '^$' -bench=. -benchmem ./..."
+
+[tasks."fmt"]
+description = "Format Go sources"
+run = [
+  { task = "fmt:simdops" },
+  { task = "fmt:tensor" },
+  { task = "fmt:nn" }
+]
+
+[tasks."fmt:simdops"]
+description = "Format simdops and fix whitespace"
+dir = "simdops"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."fmt:tensor"]
+description = "Format tensor and fix whitespace"
+dir = "tensor"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."fmt:nn"]
+description = "Format nn and fix whitespace"
+dir = "nn"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."fmt:check"]
+description = "Check Go formatting"
+run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
+
+[tasks."test:race"]
+description = "Run race detector"
+run = [
+  "go test -race ./simdops/...",
+  "go test -race ./tensor/...",
+  "go test -race ./nn/..."
+]
+
+[tasks."test:coverage"]
+description = "Report test coverage"
+run = [
+  "go test -cover ./simdops/...",
+  "go test -cover ./tensor/...",
+  "go test -cover ./nn/..."
+]
+
+[tasks."test:simd"]
+description = "Test experimental SIMD"
+env = { GOEXPERIMENT = "simd" }
+run = [
+  "go test ./simdops/...",
+  "go test ./tensor/...",
+  "go test ./nn/..."
+]
+
+[tasks."vet"]
+description = "Run go vet"
+run = [
+  "go vet ./simdops/...",
+  "go vet ./tensor/...",
+  "go vet ./nn/..."
+]
+
+[tasks."security:vuln"]
+description = "Run vulnerability analysis"
+run = [
+  "cd simdops && govulncheck ./...",
+  "cd tensor && govulncheck ./...",
+  "cd nn && govulncheck ./..."
+]
+
+[tasks."test:standalone"]
+description = "Test versioned dependencies without workspace"
+env = { GOWORK = "off" }
+run = [
+  "cd simdops && go test ./...",
+  "cd tensor && go test ./...",
+  "cd nn && go test ./..."
+]
+
+[tasks."test:fuzz"]
+description = "Fuzz layouts, broadcasting, and tensor views"
+run = [
+  "go test -run '^$' -fuzz '^FuzzShapes$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
+  "go test -run '^$' -fuzz '^FuzzBroadcast$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
+  "go test -run '^$' -fuzz '^FuzzViews$' -fuzztime=3s -parallel=2 ./tensor"
+]
+
+[tasks."example:tensor"]
+description = "Run tensor and matrix multiplication basics"
+dir = "tensor"
+run = "go run ./examples/basics"
+
+[tasks."example:linear"]
+description = "Train linear regression"
+dir = "nn"
+run = "go run ./examples/linear"
+
+[tasks."example:xor"]
+description = "Train an XOR classifier"
+dir = "nn"
+run = "go run ./examples/xor"
+
+[tasks."example:mnist"]
+description = "Train MNIST from explicitly downloaded local IDX files"
+run = "go run ./nn/examples/mnist"
+
+[tasks."bench:record"]
+description = "Record hardware metadata and repeated scalar/SIMD benchmarks"
+run = [
+  "mkdir -p benchmark-results",
+  "date -u '+%Y-%m-%dT%H:%M:%SZ' > benchmark-results/hardware.txt",
+  "git log -1 --format=source_commit=%H >> benchmark-results/hardware.txt",
+  "go version >> benchmark-results/hardware.txt",
+  "go env GOOS GOARCH GOAMD64 GOARM64 >> benchmark-results/hardware.txt",
+  "uname -a >> benchmark-results/hardware.txt",
+  "if command -v lscpu >/dev/null 2>&1; then lscpu >> benchmark-results/hardware.txt; else sysctl -n machdep.cpu.brand_string >> benchmark-results/hardware.txt; fi",
+  "go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... > benchmark-results/scalar.txt",
+  "GOEXPERIMENT=simd go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... > benchmark-results/simd.txt"
+]
+
+[tasks."deps:tidy"]
+description = "Tidy module dependencies"
+run = [
+  { task = "deps:tidy:simdops" },
+  { task = "deps:tidy:tensor" },
+  { task = "deps:tidy:nn" }
+]
+
+[tasks."deps:tidy:simdops"]
+description = "Tidy simdops dependencies"
+dir = "simdops"
+run = "go mod tidy"
+
+[tasks."deps:tidy:tensor"]
+description = "Tidy tensor dependencies"
+dir = "tensor"
+run = "go mod tidy"
+
+[tasks."deps:tidy:nn"]
+description = "Tidy nn dependencies"
+dir = "nn"
+run = "go mod tidy"
+
+[tasks."docs:api"]
+description = "Read local GoDoc for all public packages"
+run = [
+  "go doc github.com/bpradana/goml/simdops",
+  "go doc github.com/bpradana/goml/tensor",
+  "go doc github.com/bpradana/goml/nn",
+  "go doc github.com/bpradana/goml/nn/activation",
+  "go doc github.com/bpradana/goml/nn/layer",
+  "go doc github.com/bpradana/goml/nn/loss",
+  "go doc github.com/bpradana/goml/nn/optimizer"
+]
+
+[tasks."docs:examples"]
+description = "Compile and run README Go examples and compare documented output"
+run = "sh scripts/check-doc-examples.sh"
+
+[tasks."deps:sync"]
+description = "Synchronize workspace"
+run = "go work sync"
+
+[tasks."deps:verify"]
+description = "Verify dependency checksums"
+run = [
+  "cd simdops && go mod verify",
+  "cd tensor && go mod verify",
+  "cd nn && go mod verify"
+]
+
+[tasks."security:nancy"]
+description = "Scan dependencies with Sonatype Nancy"
+run = [
+  "cd simdops && go list -json -deps ./... | nancy sleuth",
+  "cd tensor && go list -json -deps ./... | nancy sleuth",
+  "cd nn && go list -json -deps ./... | nancy sleuth"
+]
+
+[tasks."check"]
+description = "Run local quality gates"
+run = [
+  { task = "fmt:check" },
+  { task = "build" },
+  { task = "vet" },
+  { task = "lint" },
+  { task = "test" }
+]
+
+[tasks."ci"]
+description = "Run CI quality gates"
+run = [
+  { task = "check" },
+  { task = "docs:examples" },
+  { task = "test:race" },
+  { task = "security:vuln" }
+]
