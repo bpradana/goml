@@ -1,8 +1,16 @@
+<div align="center">
+
+<img src="../docs/assets/nn.svg" width="88" height="88" alt="nn logo">
+
 # nn
 
 **Eager differentiation, dense networks, typed losses, and optimizers built on tensor.**
 
 [Training example](#training-example) · [Packages](#packages) · [Graph lifecycle](#graph-lifecycle) · [Inference](#inference) · [Project](../README.md)
+
+</div>
+
+---
 
 nn records differentiable operations during the forward pass.
 Backward traverses the graph in reverse order and accumulates gradients.

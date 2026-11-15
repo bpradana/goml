@@ -1,8 +1,16 @@
+<div align="center">
+
+<img src="../docs/assets/tensor.svg" width="88" height="88" alt="tensor logo">
+
 # tensor
 
 **Immutable N-dimensional float32 arrays with broadcasting and strided views.**
 
 [First program](#first-program) · [API](#api) · [Views](#views-and-ownership) · [Mathematics](#mathematics) · [Project](../README.md)
+
+</div>
+
+---
 
 tensor provides numerical arrays independently of nn.
 Contiguous arithmetic uses [simdops](../simdops/README.md).

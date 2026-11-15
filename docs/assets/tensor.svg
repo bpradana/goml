@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="tensor">
+  <title>tensor</title>
+  <desc>A multidimensional array represented by a cube with gridded faces.</desc>
+  <g stroke-width="3" stroke-linejoin="round">
+    <path d="m12 28 36 20v40L12 68Z" fill="#087e9c" stroke="#12b8d0"/>
+    <path d="m48 48 36-20v40L48 88Z" fill="#123b60" stroke="#267ba3"/>
+    <path d="m12 28 36-20 36 20-36 20Z" fill="#38d9e8" stroke="#38d9e8"/>
+  </g>
+  <g fill="none" stroke-width="2" stroke-linecap="round">
+    <path d="m30 18 36 20M30 38l36-20" stroke="#087e9c"/>
+    <path d="M30 38v40M12 48l36 20" stroke="#12b8d0"/>
+    <path d="M66 38v40M48 68l36-20" stroke="#267ba3"/>
+  </g>
+</svg>

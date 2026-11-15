@@ -1,8 +1,16 @@
+<div align="center">
+
+<img src="../docs/assets/simdops.svg" width="88" height="88" alt="simdops logo">
+
 # simdops
 
 **Allocation-free float32 slice operations, with scalar references and optional portable SIMD.**
 
 [API](#api) · [Memory contract](#memory-contract) · [SIMD](#simd) · [Verification](#verification) · [Project](../README.md)
+
+</div>
+
+---
 
 simdops operates on ordinary `[]float32` values.
 It has no dependency on tensor or nn.
