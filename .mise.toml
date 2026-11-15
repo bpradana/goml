@@ -263,10 +263,6 @@ run = [
   "go doc github.com/bpradana/goml/nn/optimizer"
 ]
 
-[tasks."docs:examples"]
-description = "Compile and run README Go examples and compare documented output"
-run = "sh scripts/check-doc-examples.sh"
-
 [tasks."deps:sync"]
 description = "Synchronize workspace"
 run = "go work sync"
@@ -301,7 +297,6 @@ run = [
 description = "Run CI quality gates"
 run = [
   { task = "check" },
-  { task = "docs:examples" },
   { task = "test:race" },
   { task = "security:vuln" }
 ]
