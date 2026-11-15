@@ -57,6 +57,12 @@ func (v *Value) RequiresGrad() bool {
 	return v.requires
 }
 
+// IsInference reports whether this value suppresses graph recording. Layers use
+// it to initialize explicit recurrent states without creating training graphs.
+func (v *Value) IsInference() bool {
+	return v.inference
+}
+
 // ZeroGrad clears this value's accumulated gradient.
 func (v *Value) ZeroGrad() {
 	v.grad = nil

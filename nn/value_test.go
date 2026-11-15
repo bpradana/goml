@@ -82,6 +82,22 @@ func TestNewValue_RejectsInvalidTensors(t *testing.T) {
 	}
 }
 
+func TestValue_IsInferenceDistinguishesConstantAndPredictionInputs(t *testing.T) {
+	constant := testValue(t, []float32{1}, nil, false)
+	if constant.IsInference() {
+		t.Fatal("ordinary constant suppressed future parameter tracking")
+	}
+
+	prediction, err := Inference(constant.Data())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !prediction.IsInference() || prediction.RequiresGrad() {
+		t.Fatal("inference mode was not exposed correctly")
+	}
+}
+
 func TestValue_DetachDropsGraphAndSharesImmutableData(t *testing.T) {
 	input := testValue(t, []float32{2}, nil, true)
 
