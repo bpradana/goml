@@ -17,8 +17,8 @@ It has no dependency on tensor or nn.
 Length validation occurs before the destination buffer is written.
 
 The module path is `github.com/bpradana/goml/simdops`.
-During bootstrap, use it from the local workspace.
-The v0.1.0 tag is not published yet.
+Install it with `go get github.com/bpradana/goml/simdops@v0.1.0`.
+Use the local workspace when developing across modules.
 
 ## First program
 

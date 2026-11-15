@@ -4,7 +4,7 @@
 
 # nn
 
-**Eager differentiation, dense networks, typed losses, and optimizers built on tensor.**
+**Eager differentiation, CPU neural networks, typed losses, and optimizers built on tensor.**
 
 [Training example](#training-example) · [Packages](#packages) · [Graph lifecycle](#graph-lifecycle) · [Inference](#inference) · [Project](../README.md)
 
@@ -18,15 +18,16 @@ The underlying [tensor](../tensor/README.md) module remains an ordinary numerica
 
 The module path is `github.com/bpradana/goml/nn`.
 Activation, layer, loss, and optimizer packages belong to this module.
-Use the local workspace until the upstream module tags are published.
+Install the published module with `go get github.com/bpradana/goml/nn@v0.1.0`.
+The additional convolution, recurrent, and transformer layers in this checkout are unreleased.
 
 ## Packages
 
 | Import suffix | Main API | Responsibility |
 | --- | --- | --- |
 | `/nn` | `Value`, `Parameter`, numerical operations | Immutable values, differentiable primitives, and graph ownership. |
-| `/nn/layer` | `Layer`, `NewDense`, `NewSequential` | Model composition and parameter discovery. |
-| `/nn/activation` | `NewReLU`, `NewSigmoid`, `NewTanh` | Element-wise activation layers and their derivative rules. |
+| `/nn/layer` | `Layer`, `NewDense`, `NewSequential`, plus the development layers below. | Model composition and parameter discovery. |
+| `/nn/activation` | `NewReLU`, `NewSigmoid`, `NewTanh`, `NewSoftmax` | Activation layers and their derivative rules. |
 | `/nn/loss` | `Loss[T]`, `NewMSE`, `NewCrossEntropy` | Scalar objectives with explicit target types. |
 | `/nn/optimizer` | `Optimizer`, `NewSGD`, `NewAdam` | Parameter updates, gradient clearing, and Adam moments. |
 
@@ -46,6 +47,18 @@ The linear example learns `y = 2x + 1` with SGD.
 It requires predictions within 0.001 of the targets.
 The XOR example composes two Dense layers with Tanh and Sigmoid activations and uses Adam.
 It requires predictions within 0.1 after 1,000 steps.
+
+The development checkout adds four complete training programs:
+
+```sh
+mise run example:cnn
+mise run example:rnn
+mise run example:lstm
+mise run example:transformer
+```
+
+All four generate local data and enforce convergence checks.
+The [example guide](examples/README.md) describes their datasets and model paths.
 
 <details>
 <summary><b>Complete linear regression program</b></summary>
@@ -186,6 +199,7 @@ Optimizers use this boundary.
 
 NewOperation registers a single-input backward rule for an already-computed result.
 It validates gradient shapes while keeping graph fields private.
+NewMultiOperation extends this boundary to multiple inputs and validates every returned gradient.
 See [custom operations](../docs/autograd.md#custom-operations) for the callback contract.
 
 ## Layers
@@ -204,6 +218,27 @@ Parameters returns each shared parameter once.
 
 The [Layer interface](layer/layer.go) contains only Forward and Parameters.
 There is no reflection-based discovery or layer registry.
+
+### Additional development layers
+
+These constructors are available in this checkout, after nn/v0.1.0:
+
+| Layer | Shape contract |
+| --- | --- |
+| `layer.NewConv2D(in, out, kernel, stride, padding, bias, rng)` | NCHW images to NCHW feature maps. |
+| `layer.NewFlatten()` | Preserve batch and flatten the remaining dimensions. |
+| `layer.NewRNN(in, hidden, rng)` | `[batch,time,in]` to `[batch,time,hidden]`. |
+| `layer.NewLSTM(in, hidden, rng)` | Same layout, with explicit hidden and cell state. |
+| `layer.NewLastStep()` | A sequence's final output as `[batch,features]`. |
+| `layer.NewMultiHeadAttention(features, heads, causal, rng)` | Self-attention preserving `[batch,time,features]`. |
+| `layer.NewLayerNorm(features, epsilon)` | Normalize the final feature dimension. |
+| `layer.NewPositionalEncoding()` | Add fixed sinusoidal sequence positions. |
+| `layer.NewTransformerEncoder(features, heads, feedForward, rng)` | Attention and feed-forward residual paths preserving sequence shape. |
+
+RNN and LSTM start each Forward call from zero state.
+ForwardState accepts caller-owned state for chunked processing.
+The transformer encoder includes no embedding, decoder, dropout, or padding mask.
+See [layer contracts](../docs/layers.md) for parameter order, numerical rules, diagrams, and limitations.
 
 ## Losses
 

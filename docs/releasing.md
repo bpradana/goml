@@ -5,9 +5,10 @@
 Each module has an independent version and a Go subdirectory tag.
 This procedure publishes dependencies before their consumers.
 
-**Current state:** the repository and v0.1.0 tags are not published.
-Local workspace checks can pass before standalone dependency checks.
-Documentation changes and local commits do not publish a release.
+**Current state:** simdops/v0.1.0, tensor/v0.1.0, and nn/v0.1.0 are published.
+The development checkout contains additional unreleased nn layers.
+Its current tensor and simdops requirements still resolve v0.1.0.
+Documentation changes and local commits do not publish a new module version.
 
 ## Version and dependency order
 
@@ -58,8 +59,7 @@ MNIST fixtures do not establish real-dataset accuracy.
 
 ## Publish simdops
 
-First publish the repository to its intended Git remote.
-Then verify the leaf module without workspace resolution:
+Verify the leaf module without workspace resolution:
 
 ```sh
 GOWORK=off mise run deps:tidy:simdops
@@ -137,3 +137,49 @@ Review breaking changes deliberately, including changes during v0.x.
 
 Publishing tags is an explicit maintainer operation.
 This guide describes that operation without authorizing an automated push.
+
+## Automated GitHub release notes
+
+The [release workflow](../.github/workflows/release.yml) runs when a maintainer pushes a matching module tag.
+It also accepts an existing tag through workflow_dispatch.
+It does not choose versions, change manifests, create tags, or push repository changes.
+
+```mermaid
+flowchart LR
+    Tag["Pushed module tag or manual existing tag"] --> Validate["Validate tag and confirm it exists"]
+    Validate --> Checkout["Check out the tagged commit"]
+    Checkout --> Test["Standalone module tests and lint"]
+    Test --> Changes["Collect module-local commits since its previous tag"]
+    Changes --> Notes["Group Conventional Commits into release notes"]
+    Notes --> Existing{"Release already exists?"}
+    Existing -->|yes| Preserve["Leave existing notes unchanged"]
+    Existing -->|no| Publish["Publish GitHub release"]
+```
+
+The notes include an exact installation command, categorized commits, commit links, and a comparison link.
+The previous tag comes from the same module's reachable history.
+Shared root-only changes do not appear in the module's commit list.
+The workflow marks prerelease versions accordingly and does not designate a repository-wide latest release.
+
+Only the publication job receives contents: write permission.
+The validation job runs the existing mise tasks with GOWORK=off.
+It uses normal Go checksum verification without a persistent exception.
+The workflow never modifies an existing release's manually edited notes.
+
+### Publish notes for an existing tag
+
+First push the workflow commit to main.
+In GitHub, open Actions, then Release notes, then Run workflow.
+Select main and enter one existing module tag, such as `nn/v0.1.0`.
+Run it separately for each module that needs release notes.
+
+The workflow supports manual backfills even when an older tag does not contain the workflow file.
+No tag deletion or recreation is needed.
+Future module tags trigger the workflow automatically when their commits include it.
+
+A GitHub release is a presentation of an existing Go module tag.
+Go module resolution depends on the tag, not on this workflow's release-note publication.
+The public Go proxy can still cache an earlier failed lookup temporarily.
+
+GitHub documents [tag triggers](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
+and the [release API](https://docs.github.com/en/rest/releases/releases#create-a-release).

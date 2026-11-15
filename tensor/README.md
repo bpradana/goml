@@ -17,7 +17,8 @@ Contiguous arithmetic uses [simdops](../simdops/README.md).
 Shape validation, indexing, and memory ownership remain part of tensor's contract.
 
 The module path is `github.com/bpradana/goml/tensor`.
-Use the local workspace while upstream module tags remain unpublished.
+Install it with `go get github.com/bpradana/goml/tensor@v0.1.0`.
+Use the local workspace when developing across modules.
 
 ## First program
 

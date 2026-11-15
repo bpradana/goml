@@ -92,8 +92,13 @@ There is no retain-graph option or higher-order differentiation API.
 | Sum and Mean | Restore reduced dimensions and broadcast over the original input. |
 | Reshape | Restore the original shape. |
 | Transpose | Apply the inverse axis permutation. |
+| Slice | Scatter into the selected input positions. |
+| Concat | Split the output gradient along the concatenation axis. |
+| Contiguous | Pass the logical gradient through the materialization. |
+| Scale | Multiply by the saved scalar factor. |
 | ReLU | Pass gradients for positive inputs, with derivative zero at zero. |
 | Sigmoid and Tanh | Use their saved forward outputs. |
+| Softmax | Apply the per-group Jacobian-vector product using saved probabilities. |
 
 Broadcast gradients sum over expanded leading and singleton dimensions.
 The resulting gradient has the original operand's shape.
@@ -119,6 +124,18 @@ Custom operations follow the same graph-consumption rules as built-in operations
 The [operation constructor](../nn/operation.go) provides this boundary without exposing graph fields.
 Activation layers use it to keep their calculations and derivatives inside nn/activation.
 CrossEntropy uses the same boundary for its calculation and derivative in nn/loss.
+
+NewMultiOperation accepts a list of inputs and one backward function.
+The callback returns one gradient tensor per input, in input order.
+Every gradient must match its corresponding input's shape and element count.
+Repeated input values accumulate their separate contributions.
+The constructor copies the input list and preserves nn's inference and graph-consumption rules.
+Concat and LayerNorm use this multi-input boundary.
+
+The development layers also use differentiable Slice, Concat, Contiguous, and Scale operations.
+RNN and LSTM record their recurrent dependencies explicitly.
+Detach a carried state when training should stop gradients at a chunk boundary.
+See [layer state semantics](layers.md#recurrent-layers-and-state) for shapes and ownership.
 
 ## Typed losses
 

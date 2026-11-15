@@ -100,6 +100,10 @@ For indexing or shape changes, run `mise run test:fuzz`.
 | Tensor basics and matrix multiplication | `mise run example:tensor` | None. |
 | Linear regression | `mise run example:linear` | Generated constants. |
 | XOR | `mise run example:xor` | Generated constants. |
+| Convolutional line classifier | `mise run example:cnn` | Generated 4×4 images. |
+| RNN sequence summation | `mise run example:rnn` | Generated numerical sequences. |
+| LSTM delayed bit recall | `mise run example:lstm` | Generated bit sequences. |
+| Transformer position-dependent recall | `mise run example:transformer` | Generated token features. |
 | MNIST | `mise run example:mnist` | Explicitly downloaded local IDX files. |
 
 Pass MNIST settings after the task separator:
@@ -141,9 +145,9 @@ mise run deps:verify
 mise run test:standalone
 ```
 
-During bootstrap, downstream tidy and standalone tests can fail.
-Their manifests require the intended upstream v0.1.0 tags.
-Use workspace tests until those versions are published.
+Current manifests resolve published upstream v0.1.0 tags.
+For a new upstream version, publish that tag before preparing downstream dependencies.
+Go's public proxy can temporarily cache a lookup made before publication.
 Do not add relative replace directives or fabricate checksum files.
 
 ## Tool upgrades

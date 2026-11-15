@@ -43,8 +43,7 @@ The workspace resolves local changes without relative replace directives.
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.1.0` |
 
-The version declarations describe the intended first releases.
-Those tags are not published yet.
+The version declarations resolve published v0.1.0 upstream module tags.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -139,6 +138,10 @@ The root nn package does not import these subpackages.
 Activation implementations live in nn/activation and reuse the Layer contract.
 Loss implementations live in nn/loss. MSE composes public nn operations.
 Activations and CrossEntropy register validated single-input backward rules through nn.NewOperation.
+LayerNorm uses nn.NewMultiOperation to connect input, scale, and bias gradients.
+Recurrent and attention layers compose ordinary differentiable operations.
+Conv2D extracts differentiable patches before matrix multiplication.
+The [layer guide](layers.md) shows the model paths and shape contracts.
 
 MSE uses `*nn.Value` targets.
 Cross-entropy uses `[]int` class labels.
@@ -159,7 +162,8 @@ The [performance report](performance.md) records the existing baseline.
 
 ## Scope
 
-The current architecture supports float32 arrays, first-order eager differentiation, and dense networks.
+The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
+The development checkout adds convolution, recurrent layers, and transformer encoder blocks after nn/v0.1.0.
 It has no CGo, GPU backend, device abstraction, JIT, compiled graph engine, or distributed-training layer.
 
 Future numerical types and additional operations must preserve the ownership and dependency boundaries.

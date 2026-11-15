@@ -52,16 +52,22 @@ reference[i] = (loss(x + epsilon*e[i]) - loss(x - epsilon*e[i])) / (2*epsilon)
 The checks use `epsilon = 1e-3`.
 The comparison tolerance is `0.003 + 0.015*abs(reference)`.
 This accounts for float32 forward rounding in the tested cases.
+Additional layer tests use weighted output seeds and tolerance `0.003 + 0.02*abs(reference)`.
+They perturb every input element and every trainable parameter element.
 
 | Area | Evidence |
 | --- | --- |
 | Binary arithmetic | Both operands, including broadcast gradients. |
 | Matrix multiplication | Left and right derivatives against finite differences. |
 | Reductions | Selected axes and multiple reduced axes. |
-| Views | Reshape and inverse transpose permutations. |
-| Activations | ReLU away from zero, Sigmoid, and Tanh. |
+| Views and sequence assembly | Reshape, inverse transpose, slice scattering, concatenation, and contiguous materialization. |
+| Activations | ReLU away from zero, Sigmoid, Tanh, and Softmax along different axes. |
 | Losses | MSE and stable cross-entropy in nn/loss. |
 | Custom operations | Output seeds, callback errors, exact input-gradient shapes, and inference behavior. |
+| Conv2D | Input and kernel derivatives across batches, channels, stride, and zero padding. |
+| RNN and LSTM | Recurrent weights, packed gates, initial states, and time-step dependencies. |
+| Normalization and attention | LayerNorm affine parameters and all attention projections. |
+| TransformerEncoder | Both residual paths and every trainable parameter. |
 
 Separate exact tests cover shared dependencies, accumulation across passes,
 consumed graphs, explicit seed shapes, and multiple singleton broadcast axes.
@@ -76,6 +82,11 @@ Tests also cover missing gradients, parameter identity, and retained gradients.
 The seeded XOR test exercises complete Dense/Tanh/Dense/Sigmoid training with Adam.
 Its final predictions must be within 0.1 of the targets.
 The linear example must match its target line within 0.001.
+
+The additional CNN, LSTM, and transformer examples must classify every generated training sample correctly.
+Their final mean cross-entropy must be below `0.03`.
+The RNN example must approximate each sequence sum within `0.03`.
+These tests use fixed seeds and do not download datasets.
 
 The loss interface tests preserve distinct target types.
 They also verify target gradients for MSE and saved class-label semantics for cross-entropy.
@@ -109,9 +120,10 @@ Local checks use Go 1.27.3 on macOS arm64 with an Apple M1 Pro.
 | Experimental SIMD suite | Passed across all modules. |
 | Shape and view fuzzing | Passed the bounded targets. |
 | Linux amd64/arm64, CGo disabled | Cross-compiled with and without SIMD. |
-| Standalone simdops | Passed with workspace mode disabled. |
+| Standalone modules | All three pass with workspace mode disabled and published upstream v0.1.0 dependencies. |
 | Linear regression and XOR | Passed their convergence checks. |
 | MNIST fixtures | Loader checks and a complete local training step passed. |
+| Additional model examples | CNN, RNN, LSTM, and transformer pass their convergence checks. |
 
 Cross-compilation checks build compatibility.
 It does not execute a binary on the target CPU.
@@ -127,7 +139,7 @@ Nancy was not run because its external service access is optional.
 | --- | --- |
 | Native amd64 tests and benchmarks | Requires a native runner or target machine. |
 | Hosted GitHub workflows | Configured locally, not executed on GitHub yet. |
-| External tensor and nn dependency resolution | Requires published upstream tags and generated checksums. |
+| Future nn release publication | Additional layers are tested locally and remain unreleased. |
 | Real MNIST dataset training | Not measured in this checkout. |
 | Held-out MNIST accuracy | Not measured. |
 

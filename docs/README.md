@@ -9,7 +9,9 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | --- | --- |
 | Use allocation-free slice operations | [simdops](../simdops/README.md) |
 | Work with numerical arrays and views | [tensor](../tensor/README.md) |
-| Build and train a dense network | [nn](../nn/README.md) |
+| Build and train a neural network | [nn](../nn/README.md) |
+| Use convolution, recurrent state, or transformer blocks | [Layers](layers.md) |
+| Run generated-data training programs | [Neural network examples](../nn/examples/README.md) |
 | Understand module and package boundaries | [Architecture](architecture.md) |
 | Check shape, memory, or numerical behavior | [Tensor semantics](tensor-semantics.md) |
 | Understand backward, accumulation, or inference | [Autograd](autograd.md) |
@@ -35,9 +37,10 @@ The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-v0.1.0 is under development. Workspace tests resolve local modules through
-`go.work`. Published dependency resolution requires the upstream module tags.
+All three modules have published v0.1.0 tags and pass local standalone checks.
+This development checkout includes additional unreleased nn layers and examples.
+Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from
 native CI runs, external installation, and real-dataset measurements.
-No hosted CI status or published release is claimed by these documents.
+Local checks do not establish hosted workflow execution or real-dataset accuracy.

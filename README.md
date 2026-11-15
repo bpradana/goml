@@ -8,7 +8,7 @@
 
 ![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8)
 ![Execution](https://img.shields.io/badge/CPU-amd64%20%C2%B7%20arm64-555)
-![Status](https://img.shields.io/badge/status-pre--release-orange)
+![Release](https://img.shields.io/badge/released-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Quick start](#quick-start) ·
@@ -29,14 +29,14 @@ The runtime uses Go and its standard library. Tensors contain `float32` values,
 views share immutable storage, and training uses eager reverse-mode differentiation.
 Default builds use scalar kernels. Go's experimental portable SIMD API is optional.
 
-**Release status:** v0.1.0 is under development. The repository has not been
-published, and its upstream module tags are unavailable. Start from this local
-checkout. Workspace builds work without published tags. External installation
-and downstream standalone checks remain [release gates](docs/releasing.md).
+**Release status:** all three modules have published v0.1.0 tags.
+This development checkout also contains unreleased convolutional, recurrent, and transformer layers.
+Use the versioned modules for v0.1.0, or this checkout for the additional [layers and examples](docs/layers.md).
 
 ## Contents
 
 - [Features](#features)
+- [Install](#install)
 - [Quick start](#quick-start)
 - [How the modules fit together](#how-the-modules-fit-together)
 - [Tensor API](#tensor-api)
@@ -60,9 +60,23 @@ and downstream standalone checks remain [release gates](docs/releasing.md).
 | Tensor mathematics | Trailing-dimension broadcasting, reductions, Exp, Log, Sqrt, and 2D matrix multiplication over contiguous or strided inputs. |
 | Differentiation | Eager reverse-mode graphs, shared-dependency accumulation, broadcast gradients, and consuming backward passes. |
 | Models | Dense layers, ReLU, Sigmoid, Tanh, and Sequential composition with seeded Xavier initialization. |
+| Additional models · unreleased | Conv2D, RNN, LSTM, multi-head self-attention, LayerNorm, positional encoding, and transformer encoder blocks. |
 | Training | Typed MSE and cross-entropy loss objects, SGD, Adam, and explicit inference without gradient graphs. |
 | Verification | Numerical references, finite-difference checks, fuzzing, race detection, linting, and measured performance baselines. |
 | Tooling | A Go workspace and mise tasks for all three modules. GitHub workflows use the same tasks. |
+
+## Install
+
+Choose the module your application needs:
+
+```sh
+go get github.com/bpradana/goml/simdops@v0.1.0
+go get github.com/bpradana/goml/tensor@v0.1.0
+go get github.com/bpradana/goml/nn@v0.1.0
+```
+
+Each command includes that module's dependencies. Go 1.27.3 or later is required.
+The additional neural network layers below require the development checkout until their next nn release.
 
 ## Quick start
 
@@ -88,6 +102,17 @@ Run a complete training example:
 mise run example:linear
 mise run example:xor
 ```
+
+The development checkout also provides these generated-data training examples:
+
+```sh
+mise run example:cnn
+mise run example:rnn
+mise run example:lstm
+mise run example:transformer
+```
+
+See the [example guide](nn/examples/README.md) for model shapes, tasks, and convergence checks.
 
 The seeded XOR example trains a 2 → 8 → 1 network for 1,000 Adam steps.
 Its convergence check requires every prediction to be within 0.1 of its target.
@@ -293,7 +318,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 | Symptom | What to check |
 | --- | --- |
 | `go test ./...` fails at the repository root | This is a multi-module workspace. Use `mise run test`. |
-| A standalone downstream check reports missing dependencies or checksums | Upstream tags are not published yet. Use workspace tests during bootstrap. |
+| A standalone downstream check reports missing dependencies or checksums | Run that module's `deps:tidy` task. For new releases, confirm the upstream tag is public and Go's proxy has refreshed. |
 | Reshape rejects a transposed array | Materialize it with `Contiguous`, then reshape. |
 | Backward reports a consumed graph | Run Forward again. Detach only when you intend to use a result as a constant. |
 | Parameters receive no gradients | Check for inference mode or detached inputs in the differentiable path. |
@@ -307,8 +332,9 @@ The [validation guide](docs/testing.md) records what has been verified.
 - **2D matrix multiplication.** No batched products, packed operands, or parallel matrix workers.
 - **Basic indexing.** Unit-step slices and axis permutations, without advanced indexing or negative axes.
 - **Eager graphs.** Backward consumes each graph. There is no retain-graph option, higher-order differentiation, or graph compiler.
-- **Dense networks.** No convolution, transformer, normalization, checkpoint, or distributed-training APIs.
-- **Release evidence.** Native amd64 execution, published dependency resolution, and real-dataset MNIST accuracy remain open validation items.
+- **Initial model implementations.** Conv2D uses square kernels without groups or dilation. Recurrent layers are unidirectional. Transformer blocks have no dropout, padding masks, or decoder.
+- **Model persistence.** No checkpoints, pretrained models, or distributed training.
+- **Release evidence.** Native amd64 execution and real-dataset MNIST accuracy remain open validation items. Published upstream dependencies pass local standalone checks.
 
 ## Documentation
 
@@ -318,6 +344,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 | [Architecture](docs/architecture.md) | Module boundaries, source layout, and ownership. |
 | [Tensor semantics](docs/tensor-semantics.md) | Shapes, views, broadcasting, reductions, and errors. |
 | [Autograd](docs/autograd.md) | Graph lifecycle, gradients, loss targets, and inference. |
+| [Neural network layers](docs/layers.md) | Convolution, recurrent state, attention, and transformer contracts. |
 | [Development](docs/development.md) | Tools, tasks, dependencies, and troubleshooting. |
 | [Validation](docs/testing.md) | Numerical references, fuzzing, portability, and current evidence. |
 | [Performance](docs/performance.md) | Measurements, method, tradeoffs, and reproduction. |

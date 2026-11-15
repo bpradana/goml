@@ -2,6 +2,13 @@
 
 [Documentation](README.md) · [Validation](testing.md)
 
+The tables below record the original numerical and dense-network baseline.
+They predate the additional convolutional, recurrent, and transformer layers.
+Those layers have Forward, Inference, and ForwardBackward benchmarks in nn/layer.
+Run `mise run bench:nn` to measure them on the current machine.
+Conv2D materializes patches, and attention materializes per-head score matrices.
+These initial implementations make no measured speedup claim.
+
 Measured locally on 2026-11-16 using Go 1.27.3, macOS arm64, Apple M1 Pro.
 Source commit: `71293b863b5c5427abffcb7911c7741eea70d956`. Recorded UTC timestamp: `2026-11-15T17:23:03Z`.
 
