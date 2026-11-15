@@ -9,6 +9,7 @@
 - Stable axis-wise Softmax in nn/activation.
 - Differentiable Slice, Concat, Contiguous, Scale, and a validated multi-input custom operation boundary.
 - Seeded CNN, RNN, LSTM, and transformer training examples with convergence checks and mise tasks.
+- A CNN option in the MNIST example, sharing local IDX loading and batching with the default dense model.
 - Independent scalar references, weighted finite-difference layer checks, and advanced-layer benchmarks.
 - Module-specific GitHub release-note automation for pushed tags and manual backfills.
 - Standalone module checks in regular CI and updated published-module installation instructions.

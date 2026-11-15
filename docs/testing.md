@@ -122,7 +122,7 @@ Local checks use Go 1.27.3 on macOS arm64 with an Apple M1 Pro.
 | Linux amd64/arm64, CGo disabled | Cross-compiled with and without SIMD. |
 | Standalone modules | All three pass with workspace mode disabled and published upstream v0.1.0 dependencies. |
 | Linear regression and XOR | Passed their convergence checks. |
-| MNIST fixtures | Loader checks and a complete local training step passed. |
+| MNIST fixtures | Loader checks, dense and CNN training, partial batches, parameter gradients, and seeded inference passed. |
 | Additional model examples | CNN, RNN, LSTM, and transformer pass their convergence checks. |
 
 Cross-compilation checks build compatibility.

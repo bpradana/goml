@@ -16,10 +16,15 @@ Ordinary tests compile and execute the generated-data examples.
 | [RNN](rnn/main.go) | `mise run example:rnn` | The sum of a three-number sequence from its final hidden state. | Four generated sequences. |
 | [LSTM](lstm/main.go) | `mise run example:lstm` | Recall the first bit after reading the last bit. | All eight three-bit sequences. |
 | [Transformer](transformer/main.go) | `mise run example:transformer` | Recover the first token at the final position. | Eight sequences with fixed feature encoding. |
-| [MNIST](mnist/README.md) | `mise run example:mnist` | Digit classification with a dense network. | Explicitly downloaded local IDX files. |
+| [MNIST](mnist/README.md) | `mise run example:mnist` | Digit classification with a dense network, or a CNN using `-model cnn`. | Explicitly downloaded local IDX files. |
 
 The convolution, RNN, LSTM, and transformer examples require the development checkout.
 They are not included in nn/v0.1.0.
+The MNIST CNN option also requires this checkout:
+
+```sh
+mise run example:mnist -- -model cnn -limit 1000 -epochs 3 -batch 32
+```
 
 ## Model paths
 

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -80,15 +81,34 @@ func TestLoad_RejectsMalformedIDX(t *testing.T) {
 }
 
 func TestRun_TrainsOnLocalIDXFixtures(t *testing.T) {
-	pixels := make([]byte, 2*784)
+	pixels := make([]byte, 3*784)
 	for i := 784; i < len(pixels); i++ {
 		pixels[i] = 255
 	}
 
-	images := writeIDX(t, []uint32{2051, 2, 28, 28}, pixels)
-	labels := writeIDX(t, []uint32{2049, 2}, []byte{0, 1})
+	images := writeIDX(t, []uint32{2051, 3, 28, 28}, pixels)
+	labels := writeIDX(t, []uint32{2049, 3}, []byte{0, 1, 2})
 
-	if err := run(images, labels, 2, 1, 2); err != nil {
-		t.Fatal(err)
+	for _, model := range []string{"dense", "cnn"} {
+		t.Run(model, func(t *testing.T) {
+			if err := run(images, labels, model, 3, 2, 2); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRun_RejectsUnknownModelBeforeOpeningDataset(t *testing.T) {
+	err := run("missing-images.gz", "missing-labels.gz", "unknown", 1, 1, 1)
+	if err == nil || !strings.Contains(err.Error(), "unknown model") {
+		t.Fatalf("expected model validation error, got %v", err)
+	}
+}
+
+func TestRun_RejectsInvalidTrainingLimits(t *testing.T) {
+	for _, arguments := range [][3]int{{0, 1, 1}, {1, 0, 1}, {1, 1, 0}, {-1, 1, 1}} {
+		if err := run("missing-images.gz", "missing-labels.gz", "cnn", arguments[0], arguments[1], arguments[2]); err == nil || !strings.Contains(err.Error(), "must be positive") {
+			t.Fatalf("accepted invalid arguments %v: %v", arguments, err)
+		}
 	}
 }

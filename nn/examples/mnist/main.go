@@ -12,8 +12,6 @@ import (
 	"os"
 
 	"github.com/bpradana/goml/nn"
-	"github.com/bpradana/goml/nn/activation"
-	"github.com/bpradana/goml/nn/layer"
 	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
@@ -22,13 +20,14 @@ import (
 func main() {
 	images := flag.String("images", "data/train-images-idx3-ubyte.gz", "local MNIST image file")
 	labels := flag.String("labels", "data/train-labels-idx1-ubyte.gz", "local MNIST label file")
+	model := flag.String("model", "dense", "classifier architecture: dense or cnn")
 	limit := flag.Int("limit", 1000, "number of training examples")
 	epochs := flag.Int("epochs", 3, "training epochs")
 	batch := flag.Int("batch", 32, "batch size")
 
 	flag.Parse()
 
-	if err := run(*images, *labels, *limit, *epochs, *batch); err != nil {
+	if err := run(*images, *labels, *model, *limit, *epochs, *batch); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -79,9 +78,14 @@ func load(path string, headerWords int) ([]uint32, []byte, error) {
 	return header, data, nil
 }
 
-func run(imagesPath, labelsPath string, limit, epochs, batch int) error {
+func run(imagesPath, labelsPath, modelName string, limit, epochs, batch int) error {
 	if limit <= 0 || epochs <= 0 || batch <= 0 {
 		return fmt.Errorf("mnist: limit, epochs, and batch must be positive")
+	}
+
+	model, err := newModel(modelName, rand.New(rand.NewPCG(1, 2)))
+	if err != nil {
+		return err
 	}
 
 	header, pixels, err := load(imagesPath, 4)
@@ -113,24 +117,7 @@ func run(imagesPath, labelsPath string, limit, epochs, batch int) error {
 		targets[i] = int(labels[i])
 	}
 
-	data, err := tensor.From(values, limit, 784)
-	if err != nil {
-		return err
-	}
-
-	rng := rand.New(rand.NewPCG(1, 2))
-
-	hidden, err := layer.NewDense(784, 32, true, rng)
-	if err != nil {
-		return err
-	}
-
-	output, err := layer.NewDense(32, 10, true, rng)
-	if err != nil {
-		return err
-	}
-
-	model, err := layer.NewSequential(hidden, activation.NewReLU(), output)
+	data, err := tensor.From(values, limit, 1, 28, 28)
 	if err != nil {
 		return err
 	}
