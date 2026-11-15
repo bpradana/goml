@@ -1,0 +1,141 @@
+name: Release notes
+
+on:
+  push:
+    tags:
+      - "simdops/v*"
+      - "tensor/v*"
+      - "nn/v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing module tag, for example nn/v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      module: ${{ steps.metadata.outputs.module }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - name: Validate module tag
+        id: metadata
+        uses: actions/github-script@v9
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const match = /^(simdops|tensor|nn)\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
+            if (!match || Number(match[2]) > 1) {
+              throw new Error('Expected a module tag such as nn/v0.1.0; current module paths support v0 and v1.');
+            }
+            if (match[5]?.split('.').some(part => /^0\d+$/.test(part))) {
+              throw new Error('Numeric prerelease identifiers cannot have leading zeroes.');
+            }
+            await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+            core.setOutput('tag', tag);
+            core.setOutput('module', match[1]);
+            core.setOutput('version', tag.slice(tag.indexOf('/') + 1));
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.metadata.outputs.tag }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          version: 2026.8.15
+          install_args: "--locked"
+      - name: Test the tagged module independently
+        env:
+          GOWORK: "off"
+          MODULE: ${{ steps.metadata.outputs.module }}
+        run: mise run "test:${MODULE}"
+      - name: Lint the tagged module independently
+        env:
+          GOWORK: "off"
+          MODULE: ${{ steps.metadata.outputs.module }}
+        run: mise run "lint:${MODULE}"
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Publish module-specific release notes
+        uses: actions/github-script@v9
+        env:
+          RELEASE_TAG: ${{ needs.verify.outputs.tag }}
+          RELEASE_MODULE: ${{ needs.verify.outputs.module }}
+          RELEASE_VERSION: ${{ needs.verify.outputs.version }}
+        with:
+          script: |
+            const { execFileSync } = require('node:child_process');
+            const tag = process.env.RELEASE_TAG;
+            const moduleName = process.env.RELEASE_MODULE;
+            const version = process.env.RELEASE_VERSION;
+            try {
+              const existing = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+              core.info(`Release already exists: ${existing.data.html_url}. Leaving its notes unchanged.`);
+              return;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+            const tags = git('tag', '--merged', tag, '--list', `${moduleName}/v*`, '--sort=-version:refname');
+            const previous = tags.split('\n').find(candidate =>
+              candidate !== tag && (version.includes('-') || !candidate.includes('-'))
+            );
+            const range = previous ? `${previous}..${tag}` : tag;
+            const commits = git('log', '--no-merges', '--format=%H%x09%s', range, '--', `${moduleName}/`);
+            const groups = new Map([
+              ['Features', []], ['Fixes', []], ['Performance', []],
+              ['Documentation', []], ['Maintenance', []]
+            ]);
+            const headings = { feat: 'Features', fix: 'Fixes', perf: 'Performance', docs: 'Documentation' };
+            const base = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}`;
+            for (const line of commits.split('\n').filter(Boolean)) {
+              const [sha, ...parts] = line.split('\t');
+              const subject = parts.join('\t');
+              const type = /^(\w+)(?:\([^)]*\))?!?:/.exec(subject)?.[1];
+              const escaped = subject.replace(/[\\`*_{}\[\]<>]/g, '\\$&');
+              groups.get(headings[type] || 'Maintenance').push(`- ${escaped} ([${sha.slice(0, 7)}](${base}/commit/${sha}))`);
+            }
+            const sections = [
+              `## ${moduleName} ${version}`,
+              `Install:\n\n\`\`\`sh\ngo get github.com/${context.repo.owner}/${context.repo.repo}/${moduleName}@${version}\n\`\`\``,
+              `Changes below include commits touching \`${moduleName}/\`.`
+            ];
+            for (const [heading, entries] of groups) {
+              if (entries.length) sections.push(`### ${heading}\n\n${entries.join('\n')}`);
+            }
+            if (!commits) sections.push('No module-local commits in this release range.');
+            if (previous) {
+              sections.push(`[Compare with ${previous}](${base}/compare/${encodeURIComponent(previous)}...${encodeURIComponent(tag)})`);
+            }
+            const release = await github.rest.repos.createRelease({
+              ...context.repo,
+              tag_name: tag,
+              name: `${moduleName} ${version}`,
+              body: sections.join('\n\n'),
+              draft: false,
+              prerelease: version.includes('-'),
+              make_latest: 'false'
+            });
+            core.info(`Published ${release.data.html_url}`);
+            await core.summary.addHeading(`${moduleName} ${version}`).addLink('Release notes', release.data.html_url).write();
