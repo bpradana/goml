@@ -214,6 +214,26 @@ run = "go run ./examples/xor"
 description = "Train MNIST from explicitly downloaded local IDX files"
 run = "go run ./nn/examples/mnist"
 
+[tasks."example:cnn"]
+description = "Train a convolutional classifier on synthetic lines"
+dir = "nn"
+run = "go run ./examples/cnn"
+
+[tasks."example:rnn"]
+description = "Train a recurrent network to sum sequences"
+dir = "nn"
+run = "go run ./examples/rnn"
+
+[tasks."example:lstm"]
+description = "Train an LSTM on delayed bit recall"
+dir = "nn"
+run = "go run ./examples/lstm"
+
+[tasks."example:transformer"]
+description = "Train a transformer encoder on position-dependent recall"
+dir = "nn"
+run = "go run ./examples/transformer"
+
 [tasks."bench:record"]
 description = "Record hardware metadata and repeated scalar/SIMD benchmarks"
 run = [
