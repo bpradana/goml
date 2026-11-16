@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="cuda">
+  <title>cuda</title>
+  <desc>A geometric grid of green compute tiles joined by parallel circuit lines.</desc>
+  <g fill="#153f33" stroke="#48b987" stroke-width="3" stroke-linejoin="round">
+    <path d="M12 12h20v20H12Zm26 0h20v20H38Zm26 0h20v20H64Z"/>
+    <path d="M12 38h20v20H12Zm26 0h20v20H38Zm26 0h20v20H64Z"/>
+    <path d="M12 64h20v20H12Zm26 0h20v20H38Zm26 0h20v20H64Z"/>
+  </g>
+  <path d="M38 38h20v20H38Z" fill="#9ce8b6" stroke="#9ce8b6" stroke-width="3" stroke-linejoin="round"/>
+  <g fill="none" stroke="#9ce8b6" stroke-width="2" stroke-linecap="round">
+    <path d="M22 32v6m26-6v6m26-6v6M22 58v6m26-6v6m26-6v6M32 22h6m20 0h6M32 48h6m20 0h6M32 74h6m20 0h6"/>
+  </g>
+</svg>

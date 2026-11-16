@@ -1,8 +1,10 @@
 go 1.27.3
 
 use (
+	./contrib/backend/metal
+	./contrib/backend/metal/examples
+	./contrib/nn/yolo
+	./nn
 	./simdops
 	./tensor
-	./nn
-	./contrib/nn/yolo
 )
