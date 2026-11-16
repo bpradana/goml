@@ -4,7 +4,8 @@ import "fmt"
 
 // MatMul allocates the 2D product [m,k] x [k,n] -> [m,n].
 // Strided inputs and zero dimensions are supported. Invalid ranks or inner
-// dimensions return an error. Accumulation is float32, in increasing k order.
+// dimensions return an error. CPU accumulation is float32 in increasing k order.
+// GPU accumulation follows the backend's Float32 ordering and may round differently.
 func MatMul(a, b *Tensor) (*Tensor, error) {
 	if err := valid("matmul", a, b); err != nil {
 		return nil, err
@@ -12,6 +13,14 @@ func MatMul(a, b *Tensor) (*Tensor, error) {
 
 	if a.Rank() != 2 || b.Rank() != 2 || a.shape[1] != b.shape[0] {
 		return nil, fmt.Errorf("tensor: matmul: incompatible shapes %v and %v", a.shape, b.shape)
+	}
+
+	if err := compatible("matmul", a, b); err != nil {
+		return nil, err
+	}
+
+	if a.gpu != nil {
+		return gpuMatMul(a, b)
 	}
 
 	m, k, n := a.shape[0], a.shape[1], b.shape[1]

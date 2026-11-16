@@ -17,6 +17,10 @@ func Concat(axis int, inputs ...*Tensor) (*Tensor, error) {
 		return nil, err
 	}
 
+	if err := compatible("concat", inputs...); err != nil {
+		return nil, err
+	}
+
 	shape := slices.Clone(inputs[0].shape)
 	if axis < 0 || axis >= len(shape) {
 		return nil, fmt.Errorf("tensor: concat: axis %d outside shape %v", axis, shape)
@@ -39,6 +43,10 @@ func Concat(axis int, inputs ...*Tensor) (*Tensor, error) {
 		}
 
 		shape[axis] += input.shape[axis]
+	}
+
+	if inputs[0].gpu != nil {
+		return gpuConcat(axis, shape, inputs)
 	}
 
 	out, err := allocated(shape)

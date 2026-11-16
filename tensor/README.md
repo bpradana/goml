@@ -17,7 +17,7 @@ Contiguous arithmetic uses [simdops](../simdops/README.md).
 Shape validation, indexing, and memory ownership remain part of tensor's contract.
 
 The module path is `github.com/bpradana/goml/tensor`.
-Install it with `go get github.com/bpradana/goml/tensor@v0.2.0`.
+Install it with `go get github.com/bpradana/goml/tensor@v0.3.0`.
 Use the local workspace when developing across modules.
 
 ## First program
@@ -194,5 +194,15 @@ See [architecture](../docs/architecture.md) for private storage and kernel bound
 The current API supports float32, unit-step slicing, explicit axes, and 2D matrix products.
 It has no arbitrary dtypes, negative strides, advanced indexing, or mutable broadcast views.
 Gradient tracking belongs to [nn](../nn/README.md).
+
+## GPU execution
+
+CPU is the default device and retains the pure-Go numerical paths.
+The optional [Metal backend](../contrib/backend/metal/README.md) implements tensor-owned compute contracts.
+To and Scope.To upload explicitly. HostData and ToCPU download explicitly.
+MakeContiguous materializes on the current device. Mixed devices return errors.
+GPU Data and Contiguous panic rather than hiding fallible transfers. At returns an error.
+Views retain independent storage leases. Close scopes, retained tensors, and devices explicitly.
+See [GPU ownership and API migration](../docs/gpu.md).
 
 Licensed under [MIT](../LICENSE).

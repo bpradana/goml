@@ -38,6 +38,10 @@ func Im2Col(input *Tensor, kernel, stride, padding int) (*Tensor, error) {
 		return nil, err
 	}
 
+	if input.gpu != nil {
+		return nil, fmt.Errorf("tensor: GPU im2col is unsupported; use native Conv2D")
+	}
+
 	outH, outW, features, err := convolutionShape(input.shape, kernel, stride, padding)
 	if err != nil {
 		return nil, err
@@ -98,6 +102,10 @@ func extractPatches(dst []float32, input *Tensor, kernel, stride, padding, outH,
 func Col2Im(patches *Tensor, shape []int, kernel, stride, padding int) (*Tensor, error) {
 	if err := valid("col2im", patches); err != nil {
 		return nil, err
+	}
+
+	if patches.gpu != nil {
+		return nil, fmt.Errorf("tensor: GPU col2im is unsupported; use native convolution gradients")
 	}
 
 	if _, _, err := internalshape.Layout(shape); err != nil {
@@ -172,6 +180,20 @@ func Conv2D(input, weight, bias *Tensor, kernel, stride, padding int) (*Tensor, 
 		if bias.Rank() != 1 || bias.shape[0] != channels {
 			return nil, fmt.Errorf("tensor: conv2d: incompatible bias shape %v", bias.shape)
 		}
+	}
+
+	if err := compatible("conv2d", input, weight); err != nil {
+		return nil, err
+	}
+
+	if bias != nil {
+		if err := compatible("conv2d", input, bias); err != nil {
+			return nil, err
+		}
+	}
+
+	if input.gpu != nil {
+		return gpuConv2D(input, weight, bias, kernel, stride, padding, []int{input.shape[0], channels, outH, outW})
 	}
 
 	out, err := allocated([]int{input.shape[0], channels, outH, outW})

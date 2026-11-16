@@ -40,6 +40,10 @@ func reduction(op string, a *Tensor, axes []int) (*Tensor, error) {
 		return nil, fmt.Errorf("tensor: %s: empty reduction in shape %v", op, a.shape)
 	}
 
+	if a.gpu != nil {
+		return gpuReduce(op, a, shape, reduce)
+	}
+
 	out, err := allocated(shape)
 	if err != nil {
 		return nil, err

@@ -11,6 +11,7 @@ import (
 // Tensor is an immutable float32 array. Obtain one through a constructor.
 // Its private storage may be shared by views; methods do not mutate it.
 type Tensor struct {
+	gpu     *storageLease
 	data    []float32
 	shape   []int
 	strides []int
@@ -145,8 +146,13 @@ func (t *Tensor) index(i int) int {
 	return p
 }
 
-// Data returns an independent copy of values in logical row-major order.
+// Data returns an independent CPU copy of values in logical row-major order.
+// GPU inputs panic; use HostData for explicit, fallible device downloads.
 func (t *Tensor) Data() []float32 {
+	if t.gpu != nil {
+		panic("tensor: Data is CPU-only; use HostData")
+	}
+
 	data := make([]float32, t.size)
 	if t.IsContiguous() {
 		copy(data, t.data[t.offset:t.offset+t.size])
@@ -195,6 +201,10 @@ func (t *Tensor) At(indices ...int) (float32, error) {
 		return 0, err
 	}
 
+	if t.gpu != nil {
+		return 0, fmt.Errorf("tensor: at: GPU storage; explicitly transfer to CPU")
+	}
+
 	if len(indices) != len(t.shape) {
 		return 0, fmt.Errorf("tensor: at: indices %v do not match shape %v", indices, t.shape)
 	}
@@ -215,6 +225,17 @@ func (t *Tensor) At(indices ...int) (float32, error) {
 func (t *Tensor) String() string {
 	if t == nil {
 		return "tensor(<nil>)"
+	}
+
+	if t.gpu != nil {
+		shape := t.shape
+
+		suffix := ""
+		if len(shape) > 8 {
+			shape, suffix = shape[:8], " ..."
+		}
+
+		return fmt.Sprintf("tensor(shape=%v%s, device=%s, GPU data)", shape, suffix, t.Device().Name())
 	}
 
 	preview := make([]float32, min(8, t.size))
@@ -240,8 +261,18 @@ func (t *Tensor) String() string {
 
 func valid(op string, ts ...*Tensor) error {
 	for _, t := range ts {
-		if t == nil || (t.data == nil && t.shape == nil && t.size == 0) {
+		if t == nil || (t.gpu == nil && t.data == nil && t.shape == nil && t.size == 0) {
 			return fmt.Errorf("tensor: %s: nil or uninitialized tensor", op)
+		}
+
+		if t.gpu != nil {
+			if t.gpu.closed.Load() {
+				return fmt.Errorf("tensor: %s: closed GPU tensor", op)
+			}
+
+			if err := t.gpu.storage.buffer.Valid(); err != nil {
+				return fmt.Errorf("tensor: %s: %w", op, err)
+			}
 		}
 	}
 

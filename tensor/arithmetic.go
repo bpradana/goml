@@ -15,9 +15,17 @@ func binary(op string, a, b *Tensor) (*Tensor, error) {
 		return nil, err
 	}
 
+	if err := compatible(op, a, b); err != nil {
+		return nil, err
+	}
+
 	shape, err := internalshape.Broadcast(a.shape, b.shape)
 	if err != nil {
 		return nil, fmt.Errorf("tensor: %s: %w", op, err)
+	}
+
+	if a.gpu != nil {
+		return gpuBinary(op, a, b, shape)
 	}
 
 	out, err := allocated(shape)
@@ -134,6 +142,10 @@ func Scale(a *Tensor, factor float32) (*Tensor, error) {
 		return nil, err
 	}
 
+	if a.gpu != nil {
+		return gpuUnary("scale", a, factor)
+	}
+
 	out := a.Contiguous()
 
 	return out, simdops.Scale(out.data, out.data, factor)
@@ -145,6 +157,10 @@ func Neg(a *Tensor) (*Tensor, error) { return Scale(a, -1) }
 func unary(op string, a *Tensor, f func(float64) float64) (*Tensor, error) {
 	if err := valid(op, a); err != nil {
 		return nil, err
+	}
+
+	if a.gpu != nil {
+		return gpuUnary(op, a, 0)
 	}
 
 	out := a.Contiguous()

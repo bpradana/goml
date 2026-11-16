@@ -18,6 +18,20 @@ func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
 		return nil, fmt.Errorf("tensor: subscaled: shapes %v and %v differ", a.shape, b.shape)
 	}
 
+	if err := compatible("subscaled", a, b); err != nil {
+		return nil, err
+	}
+
+	if a.gpu != nil {
+		scaled, err := Scale(b, factor)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = scaled.Close() }()
+
+		return Sub(a, scaled)
+	}
+
 	out, err := allocated(a.shape)
 	if err != nil {
 		return nil, err
@@ -45,6 +59,10 @@ func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
 func AdamUpdate(values, gradient *Tensor, first, second []float32, rate, beta1, beta2, epsilon float32, step uint64) (*Tensor, error) {
 	if err := valid("adam", values, gradient); err != nil {
 		return nil, err
+	}
+
+	if values.gpu != nil || gradient.gpu != nil {
+		return nil, fmt.Errorf("tensor: adam: CPU moment slices cannot update GPU values; use tensor operations with GPU moments")
 	}
 
 	if !slices.Equal(values.shape, gradient.shape) || len(first) != values.size || len(second) != values.size {
