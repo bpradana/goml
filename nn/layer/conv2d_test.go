@@ -7,7 +7,37 @@ import (
 	"testing"
 
 	"github.com/bpradana/goml/nn"
+	"github.com/bpradana/goml/tensor"
 )
+
+func TestConv2D_InferenceMatchesTrainingAcrossTiles(t *testing.T) {
+	rng := rand.New(rand.NewPCG(11, 12))
+
+	convolution, err := NewConv2D(3, 5, 3, 1, 1, true, rng)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, _ := tensor.Randn(rng, 2, 3, 12, 10)
+	data, _ = data.Transpose(0, 1, 3, 2)
+	data, _ = data.Slice(2, 1, 10)
+	input, _ := nn.NewValue(data, true)
+	inference, _ := nn.Inference(data)
+
+	tracked, err := convolution.Forward(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	untracked, err := convolution.Forward(inference)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !slices.Equal(tracked.Data().Data(), untracked.Data().Data()) || untracked.RequiresGrad() || !untracked.IsInference() {
+		t.Fatal("tiled inference changed output or gradient mode")
+	}
+}
 
 func TestConv2D_ChannelMixingAndNCHWOutputOrder(t *testing.T) {
 	convolution, err := NewConv2D(2, 2, 1, 1, 0, true, rand.New(rand.NewPCG(1, 2)))

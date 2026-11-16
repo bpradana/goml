@@ -1,6 +1,7 @@
 package layer
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"testing"
 
@@ -9,6 +10,64 @@ import (
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
 )
+
+func BenchmarkConv2D(b *testing.B) {
+	for _, configuration := range []struct {
+		name                 string
+		batch, in, out, size int
+		kernel, stride, pad  int
+	}{
+		{"Small", 4, 1, 4, 8, 3, 1, 1},
+		{"CNN", 4, 16, 32, 32, 3, 1, 1},
+		{"Pointwise", 1, 64, 64, 40, 1, 1, 0},
+		{"YOLO320", 1, 3, 16, 320, 3, 2, 1},
+		{"YOLO640", 1, 3, 16, 640, 3, 2, 1},
+	} {
+		for _, backward := range []bool{false, true} {
+			b.Run(fmt.Sprintf("%s/Backward=%t", configuration.name, backward), func(b *testing.B) {
+				rng := rand.New(rand.NewPCG(1, 2))
+
+				stage, err := NewConv2D(configuration.in, configuration.out, configuration.kernel, configuration.stride, configuration.pad, true, rng)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				data, _ := tensor.Randn(rng, configuration.batch, configuration.in, configuration.size, configuration.size)
+
+				input, _ := nn.Inference(data)
+				if backward {
+					input, _ = nn.NewValue(data, true)
+				}
+
+				b.ReportAllocs()
+
+				for b.Loop() {
+					output, err := stage.Forward(input)
+					if err != nil {
+						b.Fatal(err)
+					}
+
+					if backward {
+						loss, err := nn.Sum(output)
+						if err != nil {
+							b.Fatal(err)
+						}
+
+						if err := loss.Backward(); err != nil {
+							b.Fatal(err)
+						}
+
+						input.ZeroGrad()
+
+						for _, parameter := range stage.Parameters() {
+							parameter.ZeroGrad()
+						}
+					}
+				}
+			})
+		}
+	}
+}
 
 func BenchmarkSequential(b *testing.B) {
 	for _, mode := range []string{"Forward", "Inference", "TrainingIteration"} {

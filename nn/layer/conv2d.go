@@ -47,9 +47,9 @@ func NewConv2D(inChannels, outChannels, kernel, stride, padding int, bias bool, 
 
 // Forward maps [batch,inChannels,height,width] to [batch,outChannels,outH,outW],
 // where outH=floor((height+2*padding-kernel)/stride)+1, and similarly for outW.
-// It allocates a patch matrix, computes a matrix product, and materializes NCHW
-// output. Invalid shapes and size overflow fail before indexing. Inference is
-// propagated through the patch extraction and projection.
+// Training retains one patch matrix for differentiation. Inference uses bounded
+// patch tiles and writes NCHW output directly. Invalid shapes and size overflow
+// fail before indexing; input tensors and parameters remain immutable.
 func (c *Conv2D) Forward(input *nn.Value) (*nn.Value, error) {
 	if c == nil || c.projection == nil || input == nil || input.Data() == nil {
 		return nil, fmt.Errorf("nn: conv2d: uninitialized layer or input")
@@ -60,77 +60,31 @@ func (c *Conv2D) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn: conv2d: expected [batch,%d,height>0,width>0], got %v", c.inChannels, shape)
 	}
 
-	maxInt := int(^uint(0) >> 1)
-	if c.padding > (maxInt-shape[2])/2 || c.padding > (maxInt-shape[3])/2 {
-		return nil, fmt.Errorf("nn: conv2d: padded shape overflow")
-	}
-
-	height, width := shape[2]+2*c.padding, shape[3]+2*c.padding
-	if height < c.kernel || width < c.kernel {
-		return nil, fmt.Errorf("nn: conv2d: kernel %d exceeds padded spatial shape [%d %d]", c.kernel, height, width)
-	}
-
-	outH, outW := (height-c.kernel)/c.stride+1, (width-c.kernel)/c.stride+1
-	features := c.inChannels * c.kernel * c.kernel
-
-	storage, err := tensor.Zeros(shape[0], outH, outW, features)
-	if err != nil {
-		return nil, err
-	}
-
-	patches := storage.Data()
-	values := input.Data().Data()
-
-	for batch := range shape[0] {
-		for row := range outH {
-			for column := range outW {
-				base := ((batch*outH+row)*outW + column) * features
-
-				for channel := range c.inChannels {
-					for ky := range c.kernel {
-						for kx := range c.kernel {
-							y, x := row*c.stride-c.padding+ky, column*c.stride-c.padding+kx
-							if y >= 0 && y < shape[2] && x >= 0 && x < shape[3] {
-								patches[base+(channel*c.kernel+ky)*c.kernel+kx] = values[((batch*c.inChannels+channel)*shape[2]+y)*shape[3]+x]
-							}
-						}
-					}
-				}
-			}
+	if input.IsInference() {
+		var bias *tensor.Tensor
+		if c.projection.bias != nil {
+			bias = c.projection.bias.Value().Data()
 		}
+
+		data, err := tensor.Conv2D(input.Data(), c.projection.weight.Value().Data(), bias, c.kernel, c.stride, c.padding)
+		if err != nil {
+			return nil, err
+		}
+
+		return nn.NewOperation(data, input, nil)
 	}
 
-	matrix, err := tensor.From(patches, shape[0]*outH*outW, features)
+	matrix, err := tensor.Im2Col(input.Data(), c.kernel, c.stride, c.padding)
 	if err != nil {
 		return nil, err
 	}
 
-	size := len(values)
+	outH := (shape[2]+2*c.padding-c.kernel)/c.stride + 1
+	outW := (shape[3]+2*c.padding-c.kernel)/c.stride + 1
+	kernel, stride, padding := c.kernel, c.stride, c.padding
 
 	patchValue, err := nn.NewOperation(matrix, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		gradient := make([]float32, size)
-		patchGrad := g.Data()
-
-		for batch := range shape[0] {
-			for row := range outH {
-				for column := range outW {
-					base := ((batch*outH+row)*outW + column) * features
-
-					for channel := range c.inChannels {
-						for ky := range c.kernel {
-							for kx := range c.kernel {
-								y, x := row*c.stride-c.padding+ky, column*c.stride-c.padding+kx
-								if y >= 0 && y < shape[2] && x >= 0 && x < shape[3] {
-									gradient[((batch*c.inChannels+channel)*shape[2]+y)*shape[3]+x] += patchGrad[base+(channel*c.kernel+ky)*c.kernel+kx]
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		return tensor.From(gradient, shape...)
+		return tensor.Col2Im(g, shape, kernel, stride, padding)
 	})
 	if err != nil {
 		return nil, err
