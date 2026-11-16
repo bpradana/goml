@@ -148,8 +148,41 @@ func (t *Tensor) index(i int) int {
 // Data returns an independent copy of values in logical row-major order.
 func (t *Tensor) Data() []float32 {
 	data := make([]float32, t.size)
-	for i := range data {
-		data[i] = t.data[t.index(i)]
+	if t.IsContiguous() {
+		copy(data, t.data[t.offset:t.offset+t.size])
+		return data
+	}
+
+	var local [8]int
+
+	coordinates := local[:]
+	if t.Rank() > len(local) {
+		coordinates = make([]int, t.Rank())
+	}
+
+	last := t.Rank() - 1
+	width, source := t.shape[last], t.offset
+
+	for base := 0; base < t.size; base += width {
+		if t.strides[last] == 1 {
+			copy(data[base:base+width], t.data[source:source+width])
+		} else {
+			for j := range width {
+				data[base+j] = t.data[source+j*t.strides[last]]
+			}
+		}
+
+		for axis := last - 1; axis >= 0; axis-- {
+			coordinates[axis]++
+
+			source += t.strides[axis]
+			if coordinates[axis] < t.shape[axis] {
+				break
+			}
+
+			source -= coordinates[axis] * t.strides[axis]
+			coordinates[axis] = 0
+		}
 	}
 
 	return data

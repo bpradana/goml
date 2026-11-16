@@ -28,36 +28,89 @@ func binary(op string, a, b *Tensor) (*Tensor, error) {
 	if slices.Equal(a.shape, b.shape) && a.IsContiguous() && b.IsContiguous() {
 		av, bv := a.data[a.offset:a.offset+a.size], b.data[b.offset:b.offset+b.size]
 
-		switch op {
-		case "add":
-			err = simdops.Add(out.data, av, bv)
-		case "sub":
-			err = simdops.Sub(out.data, av, bv)
-		case "mul":
-			err = simdops.Mul(out.data, av, bv)
-		case "div":
-			err = simdops.Div(out.data, av, bv)
-		}
-
-		return out, err
+		return out, binaryContiguous(op, out.data, av, bv)
 	}
 
-	for i := range out.data {
-		x, y := a.data[broadcastIndex(a, shape, i)], b.data[broadcastIndex(b, shape, i)]
+	if out.size == 0 {
+		return out, nil
+	}
 
-		switch op {
-		case "add":
-			out.data[i] = x + y
-		case "sub":
-			out.data[i] = x - y
-		case "mul":
-			out.data[i] = x * y
-		case "div":
-			out.data[i] = x / y
+	var local [24]int
+
+	work := local[:]
+	if len(shape) > 8 {
+		work = make([]int, 3*len(shape))
+	}
+
+	rank := len(shape)
+	coordinates, as, bs := work[:rank], work[rank:2*rank], work[2*rank:3*rank]
+	broadcastStrides(a, shape, as)
+	broadcastStrides(b, shape, bs)
+
+	width, astep, bstep := 1, 0, 0
+
+	if rank > 0 {
+		width, astep, bstep = shape[rank-1], as[rank-1], bs[rank-1]
+	}
+
+	ap, bp := a.offset, b.offset
+
+	for base := 0; base < out.size; base += width {
+		ai, bi := ap, bp
+		if astep == 1 && bstep == 1 {
+			err = binaryContiguous(op, out.data[base:base+width], a.data[ai:ai+width], b.data[bi:bi+width])
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			for j := range width {
+				x, y := a.data[ai], b.data[bi]
+
+				switch op {
+				case "add":
+					out.data[base+j] = x + y
+				case "sub":
+					out.data[base+j] = x - y
+				case "mul":
+					out.data[base+j] = x * y
+				case "div":
+					out.data[base+j] = x / y
+				}
+
+				ai += astep
+				bi += bstep
+			}
+		}
+
+		for axis := rank - 2; axis >= 0; axis-- {
+			coordinates[axis]++
+			ap += as[axis]
+
+			bp += bs[axis]
+			if coordinates[axis] < shape[axis] {
+				break
+			}
+
+			ap -= coordinates[axis] * as[axis]
+			bp -= coordinates[axis] * bs[axis]
+			coordinates[axis] = 0
 		}
 	}
 
 	return out, nil
+}
+
+func binaryContiguous(op string, dst, a, b []float32) error {
+	switch op {
+	case "add":
+		return simdops.Add(dst, a, b)
+	case "sub":
+		return simdops.Sub(dst, a, b)
+	case "mul":
+		return simdops.Mul(dst, a, b)
+	default:
+		return simdops.Div(dst, a, b)
+	}
 }
 
 // Add allocates the element-wise sum using trailing-dimension broadcasting.

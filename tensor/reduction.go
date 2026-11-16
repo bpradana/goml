@@ -57,27 +57,72 @@ func reduction(op string, a *Tensor, axes []int) (*Tensor, error) {
 		}
 	}
 
-	coords := make([]int, a.Rank())
-	for i := 0; i < a.size; i++ {
-		rest := i
-		for ax := a.Rank() - 1; ax >= 0; ax-- {
-			coords[ax] = rest % a.shape[ax]
-			rest /= a.shape[ax]
+	// A contiguous reduced suffix consists of independent contiguous groups.
+	// Keep the original element order so Float32 sums do not change grouping.
+	suffix, started := true, false
+	for _, reduced := range reduce {
+		started = started || reduced
+		if started && !reduced {
+			suffix = false
+		}
+	}
+
+	if suffix && a.IsContiguous() {
+		for dest := range out.data {
+			values := a.data[a.offset+dest*count : a.offset+(dest+1)*count]
+			if op == "max" {
+				for _, value := range values {
+					out.data[dest] = float32(math.Max(float64(out.data[dest]), float64(value)))
+				}
+			} else {
+				var sum float32
+				for _, value := range values {
+					sum += value
+				}
+
+				out.data[dest] = sum
+			}
+		}
+	} else {
+		var local [16]int
+
+		work := local[:]
+		if a.Rank() > 8 {
+			work = make([]int, 2*a.Rank())
 		}
 
-		dest := 0
+		coords, destStrides := work[:a.Rank()], work[a.Rank():2*a.Rank()]
+		axis := 0
 
-		for ax, d := range a.shape {
-			if !reduce[ax] {
-				dest = dest*d + coords[ax]
+		for i, reduced := range reduce {
+			if !reduced {
+				destStrides[i] = out.strides[axis]
+				axis++
 			}
 		}
 
-		v := a.data[a.index(i)]
-		if op == "max" {
-			out.data[dest] = float32(math.Max(float64(out.data[dest]), float64(v)))
-		} else {
-			out.data[dest] += v
+		source, dest := a.offset, 0
+		for range a.size {
+			value := a.data[source]
+			if op == "max" {
+				out.data[dest] = float32(math.Max(float64(out.data[dest]), float64(value)))
+			} else {
+				out.data[dest] += value
+			}
+
+			for axis := a.Rank() - 1; axis >= 0; axis-- {
+				coords[axis]++
+				source += a.strides[axis]
+
+				dest += destStrides[axis]
+				if coords[axis] < a.shape[axis] {
+					break
+				}
+
+				source -= coords[axis] * a.strides[axis]
+				dest -= coords[axis] * destStrides[axis]
+				coords[axis] = 0
+			}
 		}
 	}
 

@@ -2,8 +2,76 @@ package tensor
 
 import (
 	"math"
+	"slices"
 	"testing"
 )
+
+func TestReductions_StridedAndContiguousGroups(t *testing.T) {
+	a := fromTest(t, []float32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 2, 2, 3)
+
+	for _, strided := range []bool{false, true} {
+		input := a
+		if strided {
+			input, _ = input.Transpose(2, 0, 1)
+		}
+
+		for _, axes := range [][]int{nil, {0}, {1}, {2}, {0, 2}, {1, 2}} {
+			reduced := make([]bool, 3)
+			for _, axis := range axes {
+				reduced[axis] = true
+			}
+
+			if len(axes) == 0 {
+				reduced = []bool{true, true, true}
+			}
+
+			for _, operation := range []struct {
+				name string
+				fn   func(*Tensor, ...int) (*Tensor, error)
+			}{{"sum", Sum}, {"mean", Mean}, {"max", Max}} {
+				got, err := operation.fn(input, axes...)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				want, counts := make([]float32, got.Numel()), make([]int, got.Numel())
+
+				for i := range input.shape[0] {
+					for j := range input.shape[1] {
+						for k := range input.shape[2] {
+							index := 0
+
+							for axis, coordinate := range []int{i, j, k} {
+								if !reduced[axis] {
+									index = index*input.shape[axis] + coordinate
+								}
+							}
+
+							value, _ := input.At(i, j, k)
+							if operation.name == "max" {
+								want[index] = max(want[index], value)
+							} else {
+								want[index] += value
+							}
+
+							counts[index]++
+						}
+					}
+				}
+
+				if operation.name == "mean" {
+					for i := range want {
+						want[i] /= float32(counts[i])
+					}
+				}
+
+				if !slices.Equal(got.Data(), want) {
+					t.Fatal(strided, axes, operation.name, got, want)
+				}
+			}
+		}
+	}
+}
 
 func TestSum_ReducesSelectedAxis(t *testing.T) {
 	a := fromTest(t, []float32{1, 2, 3, 4, 5, 6}, 2, 3)
