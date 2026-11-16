@@ -15,6 +15,11 @@ type Softmax struct{ axis int }
 // the input rank; axes are nonnegative and the selected dimension must be nonzero.
 func NewSoftmax(axis int) *Softmax { return &Softmax{axis: axis} }
 
+// Axis returns the normalization axis used by Forward and architecture snapshots.
+func (s *Softmax) Axis() int {
+	return s.axis
+}
+
 // Forward allocates softmax(input), subtracting each group's maximum for numerical
 // stability. Negative infinity has probability zero when another logit is finite.
 // NaNs, positive infinity, and all-negative-infinity groups produce NaNs.

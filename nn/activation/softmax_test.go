@@ -10,6 +10,10 @@ import (
 )
 
 func TestSoftmax_LargeLogitsAndMaskedNegativeInfinity(t *testing.T) {
+	if NewSoftmax(2).Axis() != 2 {
+		t.Fatal("softmax axis accessor changed configuration")
+	}
+
 	input := testValue(t, []float32{10000, 10001, float32(math.Inf(-1))}, []int{1, 3}, true)
 
 	output, err := NewSoftmax(1).Forward(input)
