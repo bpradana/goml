@@ -1,11 +1,56 @@
 package nn
 
 import (
+	"errors"
 	"slices"
 	"testing"
 
 	"github.com/bpradana/goml/tensor"
 )
+
+func TestBackward_LateFailurePreservesAccumulatedGradientsAndAllowsRetry(t *testing.T) {
+	x := testValue(t, []float32{2}, nil, true)
+
+	initial, _ := Mul(x, x)
+	if err := initial.Backward(); err != nil {
+		t.Fatal(err)
+	}
+
+	fail := true
+	expected := errors.New("late backward failure")
+
+	branch, err := NewOperation(x.data, x, func(g *tensor.Tensor) (*tensor.Tensor, error) {
+		if fail {
+			return nil, expected
+		}
+
+		return g, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	square, _ := Mul(x, x)
+
+	output, _ := Add(branch, square)
+	if err := output.Backward(); !errors.Is(err, expected) {
+		t.Fatal("expected late rule error", err)
+	}
+
+	if x.Grad().Data()[0] != 4 || branch.Grad() != nil || square.Grad() != nil || output.Grad() != nil || output.consumed {
+		t.Fatal("failed pass committed gradients or consumed the graph")
+	}
+
+	fail = false
+
+	if err := output.Backward(); err != nil {
+		t.Fatal(err)
+	}
+
+	if x.Grad().Data()[0] != 9 {
+		t.Fatal("retry propagated stale per-pass gradients", x.Grad())
+	}
+}
 
 func TestBackward_AccumulatesSharedDependencies(t *testing.T) {
 	input := testValue(t, []float32{2}, nil, true)

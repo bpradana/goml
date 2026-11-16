@@ -38,12 +38,16 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 	probabilities := make([]float32, len(values))
 
 	inner, outer, width := 1, 0, shape[s.axis]
+
+	var exponentials []float64
+
 	if len(values) > 0 {
 		for _, dim := range shape[s.axis+1:] {
 			inner *= dim
 		}
 
 		outer = len(values) / (width * inner)
+		exponentials = make([]float64, width)
 	}
 
 	for row := range outer {
@@ -56,12 +60,14 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 			}
 
 			sum := float64(0)
+
 			for j := range width {
-				sum += math.Exp(float64(values[base+j*inner]) - maximum)
+				exponentials[j] = math.Exp(float64(values[base+j*inner]) - maximum)
+				sum += exponentials[j]
 			}
 
 			for j := range width {
-				probabilities[base+j*inner] = float32(math.Exp(float64(values[base+j*inner])-maximum) / sum)
+				probabilities[base+j*inner] = float32(exponentials[j] / sum)
 			}
 		}
 	}

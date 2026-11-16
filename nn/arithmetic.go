@@ -127,24 +127,30 @@ func MatMul(a, b *Value) (*Value, error) {
 	av, bv := a.data, b.data
 
 	out.backward = func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
-		bt, err := bv.Transpose()
-		if err != nil {
-			return nil, err
+		var ga, gb *tensor.Tensor
+
+		if a.requires {
+			bt, err := bv.Transpose()
+			if err != nil {
+				return nil, err
+			}
+
+			ga, err = tensor.MatMul(g, bt)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		at, err := av.Transpose()
-		if err != nil {
-			return nil, err
-		}
+		if b.requires {
+			at, err := av.Transpose()
+			if err != nil {
+				return nil, err
+			}
 
-		ga, err := tensor.MatMul(g, bt)
-		if err != nil {
-			return nil, err
-		}
-
-		gb, err := tensor.MatMul(at, g)
-		if err != nil {
-			return nil, err
+			gb, err = tensor.MatMul(at, g)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return []*tensor.Tensor{ga, gb}, nil

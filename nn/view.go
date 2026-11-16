@@ -18,7 +18,12 @@ func Reshape(a *Value, shape ...int) (*Value, error) {
 	if out.requires {
 		original := a.data.Shape()
 		out.backward = func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
-			grad, err := g.Contiguous().Reshape(original...)
+			if !g.IsContiguous() {
+				g = g.Contiguous()
+			}
+
+			grad, err := g.Reshape(original...)
+
 			return []*tensor.Tensor{grad}, err
 		}
 	}

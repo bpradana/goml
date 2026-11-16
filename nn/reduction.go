@@ -67,7 +67,11 @@ func reduce(a *Value, mean bool, axes []int) (*Value, error) {
 	}
 
 	out.backward = func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
-		grad, err := g.Contiguous().Reshape(keep...)
+		if !g.IsContiguous() {
+			g = g.Contiguous()
+		}
+
+		grad, err := g.Reshape(keep...)
 		if err != nil {
 			return nil, err
 		}

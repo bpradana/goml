@@ -18,62 +18,15 @@ func Concat(axis int, inputs ...*Value) (*Value, error) {
 		return nil, err
 	}
 
-	shape := inputs[0].data.Shape()
-	if axis < 0 || axis >= len(shape) {
-		return nil, fmt.Errorf("nn: concat: axis %d outside shape %v", axis, shape)
-	}
-
-	shape[axis] = 0
-	count := 0
-	maxInt := int(^uint(0) >> 1)
-
-	for _, input := range inputs {
-		current := input.data.Shape()
-		if len(current) != len(shape) {
-			return nil, fmt.Errorf("nn: concat: incompatible ranks")
-		}
-
-		for i, dim := range current {
-			if i != axis && dim != shape[i] {
-				return nil, fmt.Errorf("nn: concat: incompatible shapes %v and %v", shape, current)
-			}
-		}
-
-		if current[axis] > maxInt-shape[axis] || input.data.Numel() > maxInt-count {
-			return nil, fmt.Errorf("nn: concat: size overflow")
-		}
-
-		shape[axis] += current[axis]
-		count += input.data.Numel()
-	}
-
-	values := make([]float32, count)
-	inner, outer := 1, 0
-
-	if count > 0 {
-		for _, dim := range shape[axis+1:] {
-			inner *= dim
-		}
-
-		outer = count / (shape[axis] * inner)
-	}
-
+	tensors := make([]*tensor.Tensor, len(inputs))
 	shapes := make([][]int, len(inputs))
-	offset := 0
 
 	for i, input := range inputs {
+		tensors[i] = input.data
 		shapes[i] = input.data.Shape()
-		width := shapes[i][axis] * inner
-
-		source := input.data.Data()
-		for row := range outer {
-			copy(values[row*shape[axis]*inner+offset:], source[row*width:(row+1)*width])
-		}
-
-		offset += width
 	}
 
-	data, err := tensor.From(values, shape...)
+	data, err := tensor.Concat(axis, tensors...)
 	if err != nil {
 		return nil, err
 	}

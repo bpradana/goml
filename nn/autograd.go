@@ -107,8 +107,6 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 	}
 
 	// Commit only after every backward operation succeeds.
-	accumulated := make(map[*Value]*tensor.Tensor, len(order))
-
 	for _, node := range order {
 		g := adjoints[node]
 
@@ -121,11 +119,11 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 			}
 		}
 
-		accumulated[node] = g
+		adjoints[node] = g
 	}
 
 	for _, node := range order {
-		node.grad = accumulated[node]
+		node.grad = adjoints[node]
 
 		if node.backward != nil {
 			node.parents = nil
@@ -159,5 +157,9 @@ func reduceGradient(g *tensor.Tensor, shape []int) (*tensor.Tensor, error) {
 		}
 	}
 
-	return g.Contiguous().Reshape(shape...)
+	if !g.IsContiguous() {
+		g = g.Contiguous()
+	}
+
+	return g.Reshape(shape...)
 }

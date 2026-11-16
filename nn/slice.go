@@ -14,6 +14,10 @@ func Slice(input *Value, axis, start, end int) (*Value, error) {
 		return nil, err
 	}
 
+	if !input.RequiresGrad() {
+		return NewOperation(data, input, nil)
+	}
+
 	shape := input.data.Shape()
 	size := input.data.Numel()
 
