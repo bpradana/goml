@@ -40,6 +40,7 @@ func NewMultiOperation(data *tensor.Tensor, inputs []*Value, backward func(*tens
 	}
 
 	if backward == nil {
+		out.releaseParameters()
 		return nil, fmt.Errorf("nn: multi operation: tracked operation requires a backward rule")
 	}
 

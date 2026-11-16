@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/nn/layer"
@@ -52,7 +54,7 @@ func TestValidateNetwork_ConvolutionsAndSharedStatelessActivations(t *testing.T)
 
 	specs[0].stride = 1
 	parameter := restored.Parameters()[0]
-	values := parameter.Value().Data().Data()
+	values := backendtest.HostData(t, parameter.Value().Data())
 	values[0] = float32(math.NaN())
 
 	data, _ := tensor.From(values, parameter.Value().Data().Shape()...)

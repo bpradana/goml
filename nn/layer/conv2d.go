@@ -60,7 +60,7 @@ func (c *Conv2D) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn: conv2d: expected [batch,%d,height>0,width>0], got %v", c.inChannels, shape)
 	}
 
-	if !input.Data().IsCPU() {
+	if !input.Data().HostAccessible() {
 		return c.deviceForward(input)
 	}
 

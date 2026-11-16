@@ -24,9 +24,9 @@ func TestArithmetic_BroadcastLayoutsMatchReference(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for i, value := range got.Data() {
-				x := pair[0].data[broadcastIndex(pair[0], got.shape, i)]
-				y := pair[1].data[broadcastIndex(pair[1], got.shape, i)]
+			for i, value := range hostData(t, got) {
+				x := broadcastValue(t, pair[0], got.shape, i)
+				y := broadcastValue(t, pair[1], got.shape, i)
 
 				var want float32
 
@@ -56,7 +56,7 @@ func TestArithmetic_BroadcastLayoutsMatchReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, value := range got.Data() {
+	for _, value := range hostData(t, got) {
 		if value != 4 {
 			t.Fatal("high-rank broadcast", got)
 		}
@@ -91,7 +91,7 @@ func TestArithmeticAndMath_KnownValues(t *testing.T) {
 	}
 
 	log, err := Log(Scalar(0))
-	if err != nil || !math.IsInf(float64(log.Data()[0]), -1) {
+	if err != nil || !math.IsInf(float64(hostData(t, log)[0]), -1) {
 		t.Fatal("log zero must be -Inf")
 	}
 
@@ -101,4 +101,27 @@ func TestArithmeticAndMath_KnownValues(t *testing.T) {
 	}
 
 	assertData(t, exp, nil, []float32{1})
+}
+
+func broadcastValue(t *testing.T, input *Tensor, shape []int, index int) float32 {
+	t.Helper()
+
+	indices := make([]int, input.Rank())
+
+	for axis := len(shape) - 1; axis >= 0; axis-- {
+		coordinate := index % shape[axis]
+		index /= shape[axis]
+
+		target := axis - len(shape) + input.Rank()
+		if target >= 0 && input.shape[target] != 1 {
+			indices[target] = coordinate
+		}
+	}
+
+	value, err := input.At(indices...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return value
 }

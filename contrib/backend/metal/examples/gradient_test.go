@@ -270,3 +270,63 @@ func TestRecurrent_MetalRNNAndLSTMGradientsMatchCPU(t *testing.T) {
 		})
 	}
 }
+
+func TestBackward_MetalRetainsForwardParameterGeneration(t *testing.T) {
+	device := deviceForTest(t)
+
+	initial, err := tensor.FromOn(device, []float32{2, 3}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parameter, err := nn.NewParameter(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := initial.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	borrowed := parameter.Value().Data()
+
+	squared, err := nn.Mul(parameter.Value(), parameter.Value())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	objective, err := nn.Sum(squared)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replacement, err := tensor.FromOn(device, []float32{20, 30}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = replacement.Close() }()
+
+	if err := parameter.Update(replacement); err != nil {
+		t.Fatal(err)
+	}
+
+	if borrowed.IsClosed() {
+		t.Fatal("live graph lost its saved parameter generation")
+	}
+
+	if err := objective.Backward(); err != nil {
+		t.Fatal(err)
+	}
+
+	expected, err := tensor.From([]float32{4, 6}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = expected.Close() }()
+
+	compareTensor(t, parameter.Value().Grad(), expected, 1e-5)
+
+	if !borrowed.IsClosed() {
+		t.Fatal("consumed graph retained retired parameter storage")
+	}
+}

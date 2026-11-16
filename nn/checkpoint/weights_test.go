@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -71,23 +73,28 @@ func TestSaveLoadWeights_PreservesFloat32BitsAndClearsGradients(t *testing.T) {
 	target := []*nn.Parameter{testParameter(t, make([]float32, len(values)), len(values)), testParameter(t, []float32{9})}
 	seedGradients(t, target)
 	identity := target[0].Value()
-	original := identity.Data()
+
+	original, err := identity.Data().Retain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = original.Close() }()
 
 	if err := LoadWeights(path, target); err != nil {
 		t.Fatal(err)
 	}
 
-	for i, value := range target[0].Value().Data().Data() {
+	for i, value := range backendtest.HostData(t, target[0].Value().Data()) {
 		if math.Float32bits(value) != bits[i] {
 			t.Fatalf("element %d: bits %08x, want %08x", i, math.Float32bits(value), bits[i])
 		}
 	}
 
-	if target[0].Value() != identity || target[0].Value().Grad() != nil || target[1].Value().Grad() != nil || target[1].Value().Data().Data()[0] != 3 {
+	if target[0].Value() != identity || target[0].Value().Grad() != nil || target[1].Value().Grad() != nil || backendtest.HostData(t, target[1].Value().Data())[0] != 3 {
 		t.Fatal("load changed identity or retained gradients")
 	}
 
-	if !slices.Equal(original.Data(), make([]float32, len(values))) {
+	if !slices.Equal(backendtest.HostData(t, original), make([]float32, len(values))) {
 		t.Fatal("load mutated old immutable storage")
 	}
 }
@@ -162,7 +169,7 @@ func TestLoadWeights_RejectsInvalidDTypeLengthsShapesAndCounts(t *testing.T) {
 				t.Fatal("accepted invalid tensor metadata")
 			}
 
-			if parameter.Value().Data().Data()[0] != 7 {
+			if backendtest.HostData(t, parameter.Value().Data())[0] != 7 {
 				t.Fatal("failed load changed weights")
 			}
 		})
@@ -195,7 +202,7 @@ func TestSaveLoadWeights_NoncontiguousAndEmptyParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(target.Value().Data().Data(), []float32{1, 4, 2, 5, 3, 6}) {
+	if !slices.Equal(backendtest.HostData(t, target.Value().Data()), []float32{1, 4, 2, 5, 3, 6}) {
 		t.Fatal("noncontiguous logical order changed")
 	}
 

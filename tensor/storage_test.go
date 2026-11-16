@@ -34,13 +34,18 @@ func (b *releaseBarrier) Close() error {
 
 func TestStorage_CloseWaitsForConcurrentCleanupReferenceRelease(t *testing.T) {
 	buffer := &releaseBarrier{started: make(chan struct{}), finish: make(chan struct{})}
-	storage := &deviceStorage{buffer: buffer}
-	storage.refs.Store(1)
-	lease := &storageLease{storage: storage}
+	allocation := newStorage(buffer)
+
+	lease, err := attachStorage(&Tensor{device: CPU()}, allocation, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	cleanupDone := make(chan struct{})
 
 	go func() {
-		_ = lease.close()
+		_ = lease.Close()
+
 		close(cleanupDone)
 	}()
 
@@ -49,7 +54,8 @@ func TestStorage_CloseWaitsForConcurrentCleanupReferenceRelease(t *testing.T) {
 	explicitDone := make(chan struct{})
 
 	go func() {
-		_ = lease.close()
+		_ = lease.Close()
+
 		close(explicitDone)
 	}()
 
@@ -64,7 +70,7 @@ func TestStorage_CloseWaitsForConcurrentCleanupReferenceRelease(t *testing.T) {
 	<-cleanupDone
 	<-explicitDone
 
-	if buffer.calls.Load() != 1 || storage.refs.Load() != 0 {
+	if buffer.calls.Load() != 1 || allocation.refs != 0 {
 		t.Fatal("allocation was not released exactly once")
 	}
 }

@@ -10,14 +10,14 @@ func TestTransfer_CPUCopiesAndLikeConstructorsPreserveOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	copy, err := view.To(nil)
+	copy, err := view.To(CPU())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	assertData(t, copy, []int{2, 2}, []float32{1, 3, 2, 4})
 
-	if !copy.IsCPU() || copy.Device() != nil || copy.IsClosed() || !copy.IsContiguous() {
+	if !copy.IsCPU() || copy.Device() == nil || copy.IsClosed() || !copy.IsContiguous() {
 		t.Fatal("unexpected CPU transfer metadata")
 	}
 
@@ -41,7 +41,18 @@ func TestTransfer_CPUCopiesAndLikeConstructorsPreserveOwnership(t *testing.T) {
 		t.Fatal("invalid constant shape accepted")
 	}
 
-	if err := source.Close(); err != nil || source.IsClosed() {
-		t.Fatal("CPU Close changed tensor validity", err)
+	if err := source.Close(); err != nil || !source.IsClosed() {
+		t.Fatal("CPU Close did not invalidate its handle", err)
 	}
+}
+
+func hostData(t testing.TB, value *Tensor) []float32 {
+	t.Helper()
+
+	values, err := value.HostData()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return values
 }

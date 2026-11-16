@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -20,7 +22,7 @@ func TestFlatten_NoncontiguousInputPreservesBatchAndGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Shape(), []int{1, 6}) || !slices.Equal(output.Data().Data(), []float32{1, 4, 2, 5, 3, 6}) {
+	if !slices.Equal(output.Data().Shape(), []int{1, 6}) || !slices.Equal(backendtest.HostData(t, output.Data()), []float32{1, 4, 2, 5, 3, 6}) {
 		t.Fatal(output.Data())
 	}
 
@@ -33,7 +35,7 @@ func TestFlatten_NoncontiguousInputPreservesBatchAndGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{1, 1, 1, 1, 1, 1}) || len(NewFlatten().Parameters()) != 0 {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{1, 1, 1, 1, 1, 1}) || len(NewFlatten().Parameters()) != 0 {
 		t.Fatal("flatten changed gradients or exposed parameters")
 	}
 }

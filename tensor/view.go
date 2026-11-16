@@ -2,7 +2,6 @@ package tensor
 
 import (
 	"fmt"
-	"runtime"
 	"slices"
 
 	internalshape "github.com/bpradana/goml/tensor/internal/shape"
@@ -25,7 +24,7 @@ func (t *Tensor) Reshape(shape ...int) (*Tensor, error) {
 		return nil, fmt.Errorf("tensor: reshape: cannot view shape %v as %v (contiguous=%t)", t.shape, shape, t.IsContiguous())
 	}
 
-	return t.share(&Tensor{data: t.data, shape: slices.Clone(shape), strides: strides, offset: t.offset, size: n}), nil
+	return t.share(&Tensor{shape: slices.Clone(shape), strides: strides, offset: t.offset, size: n}, t.scope.Load())
 }
 
 // Transpose returns a storage-sharing view with axes permuted.
@@ -59,7 +58,7 @@ func (t *Tensor) Transpose(axes ...int) (*Tensor, error) {
 		strides[i] = t.strides[a]
 	}
 
-	return t.share(&Tensor{data: t.data, shape: shape, strides: strides, offset: t.offset, size: t.size}), nil
+	return t.share(&Tensor{shape: shape, strides: strides, offset: t.offset, size: t.size}, t.scope.Load())
 }
 
 // Slice returns a view selecting [start,end) on axis with unit step.
@@ -87,27 +86,5 @@ func (t *Tensor) Slice(axis, start, end int) (*Tensor, error) {
 		offset += start * t.strides[axis]
 	}
 
-	return t.share(&Tensor{data: t.data, shape: shape, strides: slices.Clone(t.strides), offset: offset, size: n}), nil
-}
-
-// Contiguous materializes independent row-major storage in logical order,
-// including when the receiver is already contiguous.
-func (t *Tensor) Contiguous() *Tensor {
-	if t.gpu != nil {
-		panic("tensor: Contiguous is CPU-only; use MakeContiguous")
-	}
-
-	_, strides, _ := internalshape.Layout(t.shape)
-
-	return &Tensor{data: t.Data(), shape: slices.Clone(t.shape), strides: strides, size: t.size}
-}
-
-func (t *Tensor) share(view *Tensor) *Tensor {
-	defer runtime.KeepAlive(t)
-
-	if t.gpu != nil {
-		return attachStorage(view, t.gpu.storage, t.gpu.scope)
-	}
-
-	return view
+	return t.share(&Tensor{shape: shape, strides: slices.Clone(t.strides), offset: offset, size: n}, t.scope.Load())
 }

@@ -3,6 +3,8 @@ package activation
 import (
 	"slices"
 	"testing"
+
+	"github.com/bpradana/goml/tensor/backendtest"
 )
 
 func TestTanh_GradientMatchesFiniteDifferences(t *testing.T) {
@@ -18,7 +20,7 @@ func TestTanh_ExtremeInputsSaturate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Data(), []float32{-1, 0, 1}) || len(stage.Parameters()) != 0 {
+	if !slices.Equal(backendtest.HostData(t, output.Data()), []float32{-1, 0, 1}) || len(stage.Parameters()) != 0 {
 		t.Fatal(output.Data())
 	}
 }

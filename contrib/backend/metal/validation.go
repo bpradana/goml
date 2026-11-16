@@ -4,18 +4,18 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // CheckFinite validates on the GPU and downloads only a four-byte status.
-func (d *Device) CheckFinite(input tensor.DeviceView) error {
+func (d *Device) CheckFinite(input backend.View) error {
 	status, err := d.Allocate(1)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = status.Close() }()
 
-	if err := d.Fill(status, 0); err != nil {
+	if err := d.Fill(backend.View{Buffer: status, Shape: []int{1}, Strides: []int{1}}, 0); err != nil {
 		return err
 	}
 
@@ -33,7 +33,7 @@ func (d *Device) CheckFinite(input tensor.DeviceView) error {
 		return err
 	}
 
-	p := viewParams(input.Shape, input, tensor.DeviceView{})
+	p := viewParams(input.Shape, input, backend.View{})
 	err = nativeCompute(d.handle, "finite_values", source.handle, nil, target.handle, p)
 	d.mu.Unlock()
 

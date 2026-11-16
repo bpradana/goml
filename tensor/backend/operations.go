@@ -1,5 +1,7 @@
 package backend
 
+import "fmt"
+
 // UnaryOp identifies an existing element-wise numerical primitive.
 type UnaryOp uint8
 
@@ -59,3 +61,53 @@ const (
 	Bilinear
 	Bicubic
 )
+
+// String returns a diagnostic operation name, including unknown numeric values.
+func (op UnaryOp) String() string {
+	names := [...]string{"", "exp", "log", "sqrt", "relu", "sigmoid", "tanh", "silu", "relu_grad", "sigmoid_grad", "tanh_grad", "silu_grad"}
+	if op > 0 && int(op) < len(names) {
+		return names[op]
+	}
+
+	return fmt.Sprintf("UnaryOp(%d)", uint8(op))
+}
+
+// String returns a diagnostic operation name, including unknown numeric values.
+func (op BinaryOp) String() string {
+	names := [...]string{"", "add", "sub", "mul", "div"}
+	if op > 0 && int(op) < len(names) {
+		return names[op]
+	}
+
+	return fmt.Sprintf("BinaryOp(%d)", uint8(op))
+}
+
+// String returns a diagnostic operation name, including unknown numeric values.
+func (op ScalarOp) String() string {
+	names := [...]string{"", "scale", "add_scalar", "mask_upper_triangle"}
+	if op > 0 && int(op) < len(names) {
+		return names[op]
+	}
+
+	return fmt.Sprintf("ScalarOp(%d)", uint8(op))
+}
+
+// String returns a diagnostic operation name, including unknown numeric values.
+func (op ReduceOp) String() string {
+	names := [...]string{"", "sum", "mean", "max"}
+	if op > 0 && int(op) < len(names) {
+		return names[op]
+	}
+
+	return fmt.Sprintf("ReduceOp(%d)", uint8(op))
+}
+
+// String returns a diagnostic operation name, including unknown numeric values.
+func (op ResizeMode) String() string {
+	names := [...]string{"", "nearest", "bilinear", "bicubic"}
+	if op > 0 && int(op) < len(names) {
+		return names[op]
+	}
+
+	return fmt.Sprintf("ResizeMode(%d)", uint8(op))
+}

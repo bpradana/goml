@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/tensor"
 )
@@ -158,7 +160,7 @@ func TestRun_SavesLoadsAndEvaluatesBothMNISTArchitectures(t *testing.T) {
 			}
 
 			got, err := weightsModel.Predict(input)
-			if err != nil || !slices.Equal(got.Data(), want.Data()) {
+			if err != nil || !slices.Equal(backendtest.HostData(t, got), backendtest.HostData(t, want)) {
 				t.Fatalf("saved weights and full model differ: %v", err)
 			}
 

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/contrib/backend/metal"
 	"github.com/bpradana/goml/tensor"
 )
@@ -206,29 +208,8 @@ func TestDevice_ScopeRetainsPendingCommandsAndKeptResults(t *testing.T) {
 	}
 }
 
-func TestDevice_RejectsForeignBuffersAndClosedDevice(t *testing.T) {
-	first := openDevice(t)
-	second := openDevice(t)
-
-	buffer, err := first.Allocate(1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := second.Upload(buffer, []float32{1}); err == nil {
-		t.Fatal("foreign buffer accepted")
-	}
-
-	value, err := tensor.Scalar(1).To(first)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := first.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := value.HostData(); err == nil {
-		t.Fatal("closed device remained readable")
-	}
+func TestDevice_Conformance(t *testing.T) {
+	device := openDevice(t)
+	backendtest.RunDevice(t, device)
+	backendtest.RunShutdown(t, device)
 }

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -37,7 +39,7 @@ func TestBackward_LateFailurePreservesAccumulatedGradientsAndAllowsRetry(t *test
 		t.Fatal("expected late rule error", err)
 	}
 
-	if x.Grad().Data()[0] != 4 || branch.Grad() != nil || square.Grad() != nil || output.Grad() != nil || output.consumed {
+	if backendtest.HostData(t, x.Grad())[0] != 4 || branch.Grad() != nil || square.Grad() != nil || output.Grad() != nil || output.consumed {
 		t.Fatal("failed pass committed gradients or consumed the graph")
 	}
 
@@ -47,7 +49,7 @@ func TestBackward_LateFailurePreservesAccumulatedGradientsAndAllowsRetry(t *test
 		t.Fatal(err)
 	}
 
-	if x.Grad().Data()[0] != 9 {
+	if backendtest.HostData(t, x.Grad())[0] != 9 {
 		t.Fatal("retry propagated stale per-pass gradients", x.Grad())
 	}
 }
@@ -69,7 +71,7 @@ func TestBackward_AccumulatesSharedDependencies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := input.Grad().Data()[0]; got != 8 {
+	if got := backendtest.HostData(t, input.Grad())[0]; got != 8 {
 		t.Fatalf("got %v, want 8", got)
 	}
 
@@ -96,7 +98,7 @@ func TestBackward_AccumulatesAcrossForwardPassesUntilZeroGrad(t *testing.T) {
 		}
 	}
 
-	if got := input.Grad().Data()[0]; got != 8 {
+	if got := backendtest.HostData(t, input.Grad())[0]; got != 8 {
 		t.Fatalf("got %v, want accumulated gradient 8", got)
 	}
 
@@ -129,13 +131,13 @@ func TestBackward_RejectsConsumedSharedGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	before := input.Grad().Data()
+	before := backendtest.HostData(t, input.Grad())
 
 	if err := second.Backward(); err == nil {
 		t.Fatal("expected consumed dependency error")
 	}
 
-	if !slices.Equal(before, input.Grad().Data()) {
+	if !slices.Equal(before, backendtest.HostData(t, input.Grad())) {
 		t.Fatal("failed backward changed accumulated gradients")
 	}
 }
@@ -165,7 +167,7 @@ func TestBackwardWith_ValidatesSeedAndSupportsVectorOutputs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{8, 6}) {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{8, 6}) {
 		t.Fatal(input.Grad())
 	}
 }

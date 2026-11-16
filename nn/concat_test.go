@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -25,7 +27,7 @@ func TestConcat_NoncontiguousInputsAndSeededGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(y.Data().Data(), []float32{2, 3, 1, 5, 6, 4}) {
+	if !slices.Equal(backendtest.HostData(t, y.Data()), []float32{2, 3, 1, 5, 6, 4}) {
 		t.Fatal(y.Data())
 	}
 
@@ -38,7 +40,7 @@ func TestConcat_NoncontiguousInputsAndSeededGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(x.Grad().Data(), []float32{3, 1, 2, 6, 4, 5}) {
+	if !slices.Equal(backendtest.HostData(t, x.Grad()), []float32{3, 1, 2, 6, 4, 5}) {
 		t.Fatal(x.Grad())
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -34,7 +36,7 @@ func TestConv2D_InferenceMatchesTrainingAcrossTiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(tracked.Data().Data(), untracked.Data().Data()) || untracked.RequiresGrad() || !untracked.IsInference() {
+	if !slices.Equal(backendtest.HostData(t, tracked.Data()), backendtest.HostData(t, untracked.Data())) || untracked.RequiresGrad() || !untracked.IsInference() {
 		t.Fatal("tiled inference changed output or gradient mode")
 	}
 }
@@ -55,7 +57,7 @@ func TestConv2D_ChannelMixingAndNCHWOutputOrder(t *testing.T) {
 	}
 
 	want := []float32{-3.9, -3.9, -3.9, -3.9, 4.3, 6.8, 9.3, 11.8, 2.1, 2.1, 2.1, 2.1, -3.7, -1.2, 1.3, 3.8}
-	for i, value := range output.Data().Data() {
+	for i, value := range backendtest.HostData(t, output.Data()) {
 		if math.Abs(float64(value-want[i])) > 1e-5 {
 			t.Fatalf("element %d: got %g, want %g", i, value, want[i])
 		}
@@ -77,7 +79,7 @@ func TestConv2D_ReferenceCrossCorrelationAndOverlapGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Shape(), []int{1, 1, 2, 2}) || !slices.Equal(output.Data().Data(), []float32{13, 17, 25, 29}) {
+	if !slices.Equal(output.Data().Shape(), []int{1, 1, 2, 2}) || !slices.Equal(backendtest.HostData(t, output.Data()), []float32{13, 17, 25, 29}) {
 		t.Fatal(output.Data())
 	}
 
@@ -90,11 +92,11 @@ func TestConv2D_ReferenceCrossCorrelationAndOverlapGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{1, 2, 1, 2, 4, 2, 1, 2, 1}) {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{1, 2, 1, 2, 4, 2, 1, 2, 1}) {
 		t.Fatal(input.Grad())
 	}
 
-	if !slices.Equal(convolution.Parameters()[0].Value().Grad().Data(), []float32{12, 16, 24, 28}) || convolution.Parameters()[1].Value().Grad().Data()[0] != 4 {
+	if !slices.Equal(backendtest.HostData(t, convolution.Parameters()[0].Value().Grad()), []float32{12, 16, 24, 28}) || backendtest.HostData(t, convolution.Parameters()[1].Value().Grad())[0] != 4 {
 		t.Fatal("incorrect kernel or bias gradient")
 	}
 }

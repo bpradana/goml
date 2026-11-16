@@ -29,7 +29,7 @@ func (m *Model) Classes() []string {
 // normally lie in [0,1]. Size must be a multiple of 32 in [32,1280]. Invalid
 // shapes and uninitialized models return errors. Outputs own their storage.
 func (m *Model) Forward(input *tensor.Tensor) ([3]*tensor.Tensor, error) {
-	if input == nil || input.Device() == nil {
+	if input == nil || input.HostAccessible() {
 		return m.forward(input)
 	}
 

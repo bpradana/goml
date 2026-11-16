@@ -83,7 +83,12 @@ func run() error {
 		}
 
 		if iteration == 0 {
-			initialLoss = objective.Data().Data()[0]
+			lossValue1, err := objective.Data().At()
+			if err != nil {
+				return err
+			}
+
+			initialLoss = lossValue1
 		}
 
 		if err := objective.Backward(); err != nil {
@@ -112,8 +117,18 @@ func run() error {
 		return err
 	}
 
-	finalLoss := objective.Data().Data()[0]
-	values := predictions.Data()
+	lossValue2, err := objective.Data().At()
+	if err != nil {
+		return err
+	}
+
+	finalLoss := lossValue2
+
+	values, err := predictions.HostData()
+	if err != nil {
+		return err
+	}
+
 	correct := 0
 
 	for sample, label := range labels {

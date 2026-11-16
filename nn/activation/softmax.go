@@ -34,11 +34,15 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: softmax: axis %d must select a nonempty dimension in %v", s.axis, shape)
 	}
 
-	if !input.Data().IsCPU() {
+	if !input.Data().HostAccessible() {
 		return deviceSoftmax(input, s.axis)
 	}
 
-	values := input.Data().Data()
+	values, err := input.Data().HostData()
+	if err != nil {
+		return nil, err
+	}
+
 	probabilities := make([]float32, len(values))
 
 	inner, outer, width := 1, 0, shape[s.axis]
@@ -76,13 +80,16 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	data, err := tensor.From(probabilities, shape...)
+	data, err := tensor.FromLike(input.Data(), probabilities, shape...)
 	if err != nil {
 		return nil, err
 	}
 
 	return nn.NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		gradient := g.Data()
+		gradient, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
 
 		for row := range outer {
 			for column := range inner {
@@ -101,7 +108,7 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 			}
 		}
 
-		return tensor.From(gradient, shape...)
+		return tensor.FromLike(input.Data(), gradient, shape...)
 	})
 }
 

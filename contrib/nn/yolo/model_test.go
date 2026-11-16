@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/layer"
 
@@ -148,7 +150,7 @@ func TestModel_PretrainedReference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	writeFloats(t, filepath.Join(directory, "input.f32"), input.Data())
+	writeFloats(t, filepath.Join(directory, "input.f32"), backendtest.HostData(t, input))
 
 	for scale, head := range heads {
 		path := filepath.Join(directory, fmt.Sprintf("head-%d.f32", scale))
@@ -163,7 +165,7 @@ func TestModel_PretrainedReference(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		values := head.Data()
+		values := backendtest.HostData(t, head)
 		if len(expected) != len(values)*4 {
 			t.Fatal("reference head length mismatch")
 		}
@@ -221,7 +223,12 @@ func (s *routeStage) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("route lost inference mode")
 	}
 
-	s.seen = input.Data().Data()
+	values, err := input.Data().HostData()
+	if err != nil {
+		return nil, err
+	}
+
+	s.seen = values
 
 	data, err := tensor.From([]float32{s.tag}, 1, 1, 1, 1)
 	if err != nil {
@@ -267,7 +274,7 @@ func TestModel_ForwardUsesBackboneSkipsAndThreeHeadSources(t *testing.T) {
 	}
 
 	for scale, index := range [3]int{15, 18, 21} {
-		if !slices.Equal(heads[scale].Data(), []float32{float32(index), float32(index)}) {
+		if !slices.Equal(backendtest.HostData(t, heads[scale]), []float32{float32(index), float32(index)}) {
 			t.Fatal(scale, heads[scale])
 		}
 	}

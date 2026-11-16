@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -13,7 +15,7 @@ func TestPostprocess_RestoresCoordinatesAndRejectsInvalidMetadata(t *testing.T) 
 	options := DefaultOptions()
 	options.Size = 32
 	heads := emptyHeads(t, 1, 32)
-	values := heads[0].Data()
+	values := backendtest.HostData(t, heads[0])
 	values[64*16] = 100
 	heads[0], _ = tensor.From(values, 1, 65, 4, 4)
 
@@ -62,7 +64,7 @@ func TestDecode_UniformDistributionAndHighestClassProbability(t *testing.T) {
 	options := DefaultOptions()
 	options.Size = 32
 	heads := emptyHeads(t, 2, 32)
-	values := heads[0].Data()
+	values := backendtest.HostData(t, heads[0])
 	values[64*16] = 0
 	values[65*16] = float32(math.Log(3))
 	heads[0], _ = tensor.From(values, 1, 66, 4, 4)
@@ -85,7 +87,7 @@ func TestDecode_StableDFLForLargeLogitsAndAllStrides(t *testing.T) {
 	for scale, head := range heads {
 		side := 32 / (8 << scale)
 		area := side * side
-		values := head.Data()
+		values := backendtest.HostData(t, head)
 		values[64*area] = 1000
 
 		for axis := range 4 {
@@ -123,7 +125,7 @@ func TestDecode_RejectsMalformedAndNonfiniteHeads(t *testing.T) {
 	}
 
 	heads = emptyHeads(t, 1, 32)
-	values := heads[0].Data()
+	values := backendtest.HostData(t, heads[0])
 	values[0] = float32(math.NaN())
 
 	heads[0], _ = tensor.From(values, 1, 65, 4, 4)

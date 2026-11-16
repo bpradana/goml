@@ -3,6 +3,8 @@ package nn
 import (
 	"math"
 	"testing"
+
+	"github.com/bpradana/goml/tensor/backendtest"
 )
 
 func TestMath_ExpLogSqrtGradientsMatchIndependentDerivatives(t *testing.T) {
@@ -32,8 +34,8 @@ func TestMath_ExpLogSqrtGradientsMatchIndependentDerivatives(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for index, value := range input.Data().Data() {
-				got, want := float64(input.Grad().Data()[index]), operation.derivative(float64(value))
+			for index, value := range backendtest.HostData(t, input.Data()) {
+				got, want := float64(backendtest.HostData(t, input.Grad())[index]), operation.derivative(float64(value))
 				if math.Abs(got-want) > 1e-6 {
 					t.Fatalf("element %d: got %g, want %g", index, got, want)
 				}

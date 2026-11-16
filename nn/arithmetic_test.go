@@ -1,6 +1,10 @@
 package nn
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/bpradana/goml/tensor/backendtest"
+)
 
 func testBinaryGradients(t *testing.T, operation func(*Value, *Value) (*Value, error)) {
 	t.Helper()
@@ -74,7 +78,7 @@ func TestAdd_EmptyBroadcastGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if a.Grad().Numel() != 0 || b.Grad().Data()[0] != 0 {
+	if a.Grad().Numel() != 0 || backendtest.HostData(t, b.Grad())[0] != 0 {
 		t.Fatal("empty broadcast produced invalid gradients")
 	}
 }
@@ -97,13 +101,13 @@ func TestAdd_GradientsReduceMultipleSingletonAndLeadingAxes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, gradient := range a.Grad().Data() {
+	for _, gradient := range backendtest.HostData(t, a.Grad()) {
 		if gradient != 4 {
 			t.Fatalf("left gradient got %v, want 4", gradient)
 		}
 	}
 
-	for _, gradient := range b.Grad().Data() {
+	for _, gradient := range backendtest.HostData(t, b.Grad()) {
 		if gradient != 6 {
 			t.Fatalf("right gradient got %v, want 6", gradient)
 		}

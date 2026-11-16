@@ -197,7 +197,7 @@ func projectSequence(input *nn.Value, projection *Dense) (*nn.Value, error) {
 }
 
 func maskFuture(input *nn.Value) (*nn.Value, error) {
-	if !input.Data().IsCPU() {
+	if !input.Data().HostAccessible() {
 		data, err := tensor.MaskUpperTriangle(input.Data(), float32(math.Inf(-1)))
 		if err != nil {
 			return nil, err
@@ -209,7 +209,11 @@ func maskFuture(input *nn.Value) (*nn.Value, error) {
 	}
 
 	shape := input.Data().Shape()
-	values := input.Data().Data()
+
+	values, err := input.Data().HostData()
+	if err != nil {
+		return nil, err
+	}
 
 	for row := range shape[0] {
 		for column := row + 1; column < shape[1]; column++ {
@@ -217,13 +221,16 @@ func maskFuture(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	data, err := tensor.From(values, shape...)
+	data, err := tensor.FromLike(input.Data(), values, shape...)
 	if err != nil {
 		return nil, err
 	}
 
 	return nn.NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		gradient := g.Data()
+		gradient, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
 
 		for row := range shape[0] {
 			for column := row + 1; column < shape[1]; column++ {
@@ -231,7 +238,7 @@ func maskFuture(input *nn.Value) (*nn.Value, error) {
 			}
 		}
 
-		return tensor.From(gradient, shape...)
+		return tensor.FromLike(input.Data(), gradient, shape...)
 	})
 }
 

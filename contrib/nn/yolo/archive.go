@@ -314,7 +314,12 @@ func validateNetwork(network *layer.Sequential, specs []convSpec) error {
 		}
 
 		for _, parameter := range parameters[index*2 : index*2+2] {
-			for _, value := range parameter.Value().Data().Data() {
+			values, err := parameter.Value().Data().HostData()
+			if err != nil {
+				return err
+			}
+
+			for _, value := range values {
 				if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
 					return fmt.Errorf("nonfinite weights")
 				}

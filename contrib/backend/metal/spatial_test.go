@@ -5,6 +5,8 @@ package metal_test
 import (
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -63,8 +65,8 @@ func TestPool_MetalForwardAndOverlappingGradientsMatchCPU(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertValues(t, output, expected.Data())
-	assertValues(t, gradient, expectedGradient.Data())
+	assertValues(t, output, backendtest.HostData(t, expected))
+	assertValues(t, gradient, backendtest.HostData(t, expectedGradient))
 }
 
 func TestUpsample_MetalAllModesAndGradientsMatchCPU(t *testing.T) {
@@ -123,8 +125,16 @@ func TestUpsample_MetalAllModesAndGradientsMatchCPU(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			assertValues(t, output, expected.Data())
-			assertValues(t, gradient, expectedGradient.Data())
+			assertValues(t, output, backendtest.HostData(t, expected))
+			assertValues(t, gradient, backendtest.HostData(t, expectedGradient))
 		})
 	}
+}
+
+func TestSpatial_Conformance(t *testing.T) {
+	device := openDevice(t)
+	backendtest.RunPool(t, device)
+	backendtest.RunPoolBackward(t, device)
+	backendtest.RunResize(t, device)
+	backendtest.RunResizeBackward(t, device)
 }

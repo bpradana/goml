@@ -37,7 +37,7 @@ func TestAdamUpdate_StridedInputsMatchReference(t *testing.T) {
 	}
 
 	for i, want := range []float32{0.99, 3.01, 1.99, 4.01} {
-		if math.Abs(float64(got.Data()[i]-want)) > 1e-6 {
+		if math.Abs(float64(hostData(t, got)[i]-want)) > 1e-6 {
 			t.Fatal(i, got, want)
 		}
 	}
@@ -65,8 +65,8 @@ func TestSubScaled_PreservesSeparateFloat32Rounding(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for i, value := range got.Data() {
-			expected := want.data[i]
+		for i, value := range hostData(t, got) {
+			expected := hostData(t, want)[i]
 			if math.Float32bits(value) != math.Float32bits(expected) && !(math.IsNaN(float64(value)) && math.IsNaN(float64(expected))) {
 				t.Fatal(factor, i, value, expected)
 			}

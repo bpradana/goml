@@ -34,11 +34,15 @@ func (*CrossEntropy) Forward(prediction *nn.Value, target []int) (*nn.Value, err
 		return nil, fmt.Errorf("nn/loss: cross-entropy: expected nonempty [batch,classes] logits and batch targets, got %v and %d targets", shape, len(target))
 	}
 
-	if !data.IsCPU() {
+	if !data.HostAccessible() {
 		return deviceCrossEntropy(prediction, target)
 	}
 
-	input := data.Data()
+	input, err := data.HostData()
+	if err != nil {
+		return nil, err
+	}
+
 	rows, columns := shape[0], shape[1]
 
 	var (
@@ -85,17 +89,26 @@ func (*CrossEntropy) Forward(prediction *nn.Value, target []int) (*nn.Value, err
 		}
 	}
 
-	result := tensor.Scalar(float32(totalLoss / float64(rows)))
+	result, err := tensor.FromLike(data, []float32{float32(totalLoss / float64(rows))})
+	if err != nil {
+		return nil, err
+	}
+
 	if gradient == nil {
 		return nn.NewOperation(result, prediction, nil)
 	}
 
-	saved, err := tensor.From(gradient, shape...)
+	saved, err := tensor.FromLike(data, gradient, shape...)
 	if err != nil {
 		return nil, err
 	}
 
 	return nn.NewOperation(result, prediction, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		return tensor.Scale(saved, g.Data()[0])
+		values, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
+
+		return tensor.Scale(saved, values[0])
 	})
 }

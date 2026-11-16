@@ -24,13 +24,17 @@ func (*Sigmoid) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: sigmoid: nil or uninitialized value")
 	}
 
-	if !input.Data().IsCPU() {
+	if !input.Data().HostAccessible() {
 		return deviceActivation(input, "sigmoid")
 	}
 
 	source := input.Data()
 	shape := source.Shape()
-	values := source.Data()
+
+	values, err := source.HostData()
+	if err != nil {
+		return nil, err
+	}
 
 	for i, x := range values {
 		if x >= 0 {
@@ -41,7 +45,7 @@ func (*Sigmoid) Forward(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	data, err := tensor.From(values, shape...)
+	data, err := tensor.FromLike(input.Data(), values, shape...)
 	if err != nil {
 		return nil, err
 	}
@@ -51,13 +55,16 @@ func (*Sigmoid) Forward(input *nn.Value) (*nn.Value, error) {
 	}
 
 	return nn.NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		gradient := g.Data()
+		gradient, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
 
 		for i, value := range values {
 			gradient[i] *= value * (1 - value)
 		}
 
-		return tensor.From(gradient, shape...)
+		return tensor.FromLike(input.Data(), gradient, shape...)
 	})
 }
 

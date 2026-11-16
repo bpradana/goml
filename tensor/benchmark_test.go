@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bpradana/goml/simdops"
+	internalshape "github.com/bpradana/goml/tensor/internal/shape"
 )
 
 func BenchmarkMatMul(b *testing.B) {
@@ -118,7 +119,7 @@ func BenchmarkData(b *testing.B) {
 			b.SetBytes(int64(a.Numel() * 4))
 
 			for b.Loop() {
-				_ = a.Data()
+				_ = hostData(b, a)
 			}
 		})
 	}
@@ -146,18 +147,16 @@ func BenchmarkMatMulAxpy(b *testing.B) {
 			a, _ := Randn(rng, size, size)
 			c, _ := Randn(rng, size, size)
 
+			av, cv := hostData(b, a), hostData(b, c)
 			b.ReportAllocs()
 
 			for b.Loop() {
-				out, err := allocated([]int{size, size})
-				if err != nil {
-					b.Fatal(err)
-				}
+				out := make([]float32, size*size)
 
 				for i := range size {
-					row := out.data[i*size : (i+1)*size]
+					row := out[i*size : (i+1)*size]
 					for p := range size {
-						if err := simdops.Axpy(row, c.data[p*size:(p+1)*size], row, a.data[i*size+p]); err != nil {
+						if err := simdops.Axpy(row, cv[p*size:(p+1)*size], row, av[i*size+p]); err != nil {
 							b.Fatal(err)
 						}
 					}
@@ -175,10 +174,27 @@ func directConvolution(input, weight *Tensor, kernel, stride, padding int) (*Ten
 		return nil, err
 	}
 
-	out, err := allocated([]int{input.shape[0], weight.shape[1], outH, outW})
+	values, err := input.HostData()
 	if err != nil {
 		return nil, err
 	}
+
+	weights, err := weight.HostData()
+	if err != nil {
+		return nil, err
+	}
+
+	_, inputStrides, err := internalshape.Layout(input.shape)
+	if err != nil {
+		return nil, err
+	}
+
+	_, weightStrides, err := internalshape.Layout(weight.shape)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]float32, input.shape[0]*weight.shape[1]*outH*outW)
 
 	for batch := range input.shape[0] {
 		for channel := range weight.shape[1] {
@@ -193,22 +209,22 @@ func directConvolution(input, weight *Tensor, kernel, stride, padding int) (*Ten
 
 								var value float32
 								if iy >= 0 && iy < input.shape[2] && ix >= 0 && ix < input.shape[3] {
-									value = input.data[input.offset+batch*input.strides[0]+ic*input.strides[1]+iy*input.strides[2]+ix*input.strides[3]]
+									value = values[batch*inputStrides[0]+ic*inputStrides[1]+iy*inputStrides[2]+ix*inputStrides[3]]
 								}
 
 								feature := (ic*kernel+ky)*kernel + kx
-								sum += value * weight.data[weight.offset+feature*weight.strides[0]+channel*weight.strides[1]]
+								sum += value * weights[feature*weightStrides[0]+channel*weightStrides[1]]
 							}
 						}
 					}
 
-					out.data[((batch*weight.shape[1]+channel)*outH+y)*outW+x] = sum
+					output[((batch*weight.shape[1]+channel)*outH+y)*outW+x] = sum
 				}
 			}
 		}
 	}
 
-	return out, nil
+	return From(output, input.shape[0], weight.shape[1], outH, outW)
 }
 
 func BenchmarkConvolutionStrategies(b *testing.B) {
@@ -256,7 +272,7 @@ func BenchmarkConvolutionStrategies(b *testing.B) {
 						}
 
 						if err == nil {
-							_ = product.Contiguous()
+							_ = contiguous(b, product)
 						}
 					}
 

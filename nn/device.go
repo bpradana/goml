@@ -4,18 +4,24 @@ import (
 	"fmt"
 
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 func sameDevice(a, b *tensor.Tensor) bool {
 	first, second := a.Device(), b.Device()
-	return (first == nil && second == nil) || (first != nil && second != nil && first.ID() == second.ID())
+	return first != nil && second != nil && first.ID() == second.ID()
 }
 
 // ToDevice transfers a parameter set atomically, preserving parameter identity
 // and deduplicating shared parameters. Gradients are cleared after success.
 // Transfer and synchronization failures leave the original parameter set intact.
 // Create optimizers after moving parameters; synchronize against training.
-func ToDevice(parameters []*Parameter, device tensor.Device) error {
+// Cross-device transfers reject active parameter graphs; consume them first.
+func ToDevice(parameters []*Parameter, device backend.Device) error {
+	if device == nil {
+		return fmt.Errorf("nn: transfer: device required; use tensor.CPU()")
+	}
+
 	seen := make(map[*Parameter]bool)
 	unique := make([]*Parameter, 0, len(parameters))
 	prepared := make([]*tensor.Tensor, 0, len(parameters))
@@ -34,6 +40,10 @@ func ToDevice(parameters []*Parameter, device tensor.Device) error {
 			return fmt.Errorf("nn: transfer: invalid parameter")
 		}
 
+		if device.ID() != parameter.value.data.Device().ID() && parameter.value.parameter.inUse() {
+			return fmt.Errorf("nn: transfer: consume active parameter graphs before changing devices")
+		}
+
 		if seen[parameter] {
 			continue
 		}
@@ -49,16 +59,12 @@ func ToDevice(parameters []*Parameter, device tensor.Device) error {
 		prepared = append(prepared, next)
 	}
 
-	if device != nil {
-		if err := device.Synchronize(); err != nil {
-			return err
-		}
+	if err := device.Synchronize(); err != nil {
+		return err
 	}
 
 	for i, parameter := range unique {
-		previous := parameter.value.data
-		parameter.value.data = prepared[i]
-		_ = previous.Close()
+		parameter.replace(prepared[i])
 
 		parameter.ZeroGrad()
 	}

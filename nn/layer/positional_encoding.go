@@ -34,7 +34,10 @@ func (*PositionalEncoding) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, err
 	}
 
-	values := encoding.Data()
+	values, err := encoding.HostData()
+	if err != nil {
+		return nil, err
+	}
 
 	for position := range shape[1] {
 		for feature := range shape[2] {

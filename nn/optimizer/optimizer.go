@@ -37,7 +37,7 @@ func optimizerParameters(parameters []*nn.Parameter, learningRate float32) ([]*n
 
 		if len(unique) > 0 {
 			first, current := unique[0].Value().Data().Device(), parameter.Value().Data().Device()
-			if (first == nil) != (current == nil) || (first != nil && first.ID() != current.ID()) {
+			if first.ID() != current.ID() {
 				return nil, fmt.Errorf("nn: optimizer: parameters must use one device")
 			}
 		}

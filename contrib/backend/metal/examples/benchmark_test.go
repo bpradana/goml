@@ -60,7 +60,7 @@ func BenchmarkYOLOStartup(b *testing.B) {
 
 			b.StopTimer()
 
-			if err := model.ToDevice(nil); err != nil {
+			if err := model.ToDevice(tensor.CPU()); err != nil {
 				b.Fatal(err)
 			}
 

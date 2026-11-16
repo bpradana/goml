@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/tensor"
@@ -35,7 +37,7 @@ func TestRestore_RoundTripsSiLUPoolingAndUpsampling(t *testing.T) {
 		}
 
 		got, err := restored.Predict(input)
-		if err != nil || !slices.Equal(got.Data(), want.Data()) || !slices.Equal(got.Shape(), want.Shape()) {
+		if err != nil || !slices.Equal(backendtest.HostData(t, got), backendtest.HostData(t, want)) || !slices.Equal(got.Shape(), want.Shape()) {
 			t.Fatalf("round-trip mismatch: %v %v", got, err)
 		}
 	}
@@ -71,7 +73,13 @@ func TestRestore_PreservesSharingAndUsesSuppliedTrainableParameters(t *testing.T
 
 	parameters := make([]*nn.Parameter, len(model.Parameters()))
 	for i, parameter := range model.Parameters() {
-		parameters[i], err = nn.NewParameter(parameter.Value().Data().Contiguous())
+		data, err := parameter.Value().Data().MakeContiguous()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = data.Close() }()
+
+		parameters[i], err = nn.NewParameter(data)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,7 +106,7 @@ func TestRestore_PreservesSharingAndUsesSuppliedTrainableParameters(t *testing.T
 	}
 
 	got, err := restored.Predict(input)
-	if err != nil || !slices.Equal(got.Data(), want.Data()) {
+	if err != nil || !slices.Equal(backendtest.HostData(t, got), backendtest.HostData(t, want)) {
 		t.Fatalf("prediction mismatch: %v %v", got, err)
 	}
 

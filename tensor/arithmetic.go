@@ -2,183 +2,119 @@ package tensor
 
 import (
 	"fmt"
-	"math"
-	"slices"
+	"runtime"
 
-	internalshape "github.com/bpradana/goml/tensor/internal/shape"
-
-	"github.com/bpradana/goml/simdops"
+	"github.com/bpradana/goml/tensor/backend"
+	"github.com/bpradana/goml/tensor/internal/shape"
 )
 
-func binary(op string, a, b *Tensor) (*Tensor, error) {
-	if err := valid(op, a, b); err != nil {
+func binary(op backend.BinaryOp, a, b *Tensor) (*Tensor, error) {
+	defer runtime.KeepAlive([]*Tensor{a, b})
+
+	if err := valid("binary", a, b); err != nil {
 		return nil, err
 	}
 
-	if err := compatible(op, a, b); err != nil {
+	if err := compatible("binary", a, b); err != nil {
 		return nil, err
 	}
 
-	shape, err := internalshape.Broadcast(a.shape, b.shape)
+	dimensions, err := shape.Broadcast(a.shape, b.shape)
 	if err != nil {
-		return nil, fmt.Errorf("tensor: %s: %w", op, err)
+		return nil, fmt.Errorf("tensor: binary: %w", err)
 	}
 
-	if a.gpu != nil {
-		return gpuBinary(op, a, b, shape)
+	compute, ok := a.device.(backend.BinaryBackend)
+	if !ok {
+		return nil, unsupported("binary", a.device)
 	}
 
-	out, err := allocated(shape)
+	out, err := allocatedOn(dimensions, a, b)
 	if err != nil {
 		return nil, err
 	}
 
-	if slices.Equal(a.shape, b.shape) && a.IsContiguous() && b.IsContiguous() {
-		av, bv := a.data[a.offset:a.offset+a.size], b.data[b.offset:b.offset+b.size]
-
-		return out, binaryContiguous(op, out.data, av, bv)
-	}
-
-	if out.size == 0 {
-		return out, nil
-	}
-
-	var local [24]int
-
-	work := local[:]
-	if len(shape) > 8 {
-		work = make([]int, 3*len(shape))
-	}
-
-	rank := len(shape)
-	coordinates, as, bs := work[:rank], work[rank:2*rank], work[2*rank:3*rank]
-	broadcastStrides(a, shape, as)
-	broadcastStrides(b, shape, bs)
-
-	width, astep, bstep := 1, 0, 0
-
-	if rank > 0 {
-		width, astep, bstep = shape[rank-1], as[rank-1], bs[rank-1]
-	}
-
-	ap, bp := a.offset, b.offset
-
-	for base := 0; base < out.size; base += width {
-		ai, bi := ap, bp
-		if astep == 1 && bstep == 1 {
-			err = binaryContiguous(op, out.data[base:base+width], a.data[ai:ai+width], b.data[bi:bi+width])
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			for j := range width {
-				x, y := a.data[ai], b.data[bi]
-
-				switch op {
-				case "add":
-					out.data[base+j] = x + y
-				case "sub":
-					out.data[base+j] = x - y
-				case "mul":
-					out.data[base+j] = x * y
-				case "div":
-					out.data[base+j] = x / y
-				}
-
-				ai += astep
-				bi += bstep
-			}
-		}
-
-		for axis := rank - 2; axis >= 0; axis-- {
-			coordinates[axis]++
-			ap += as[axis]
-
-			bp += bs[axis]
-			if coordinates[axis] < shape[axis] {
-				break
-			}
-
-			ap -= coordinates[axis] * as[axis]
-			bp -= coordinates[axis] * bs[axis]
-			coordinates[axis] = 0
-		}
+	if err := compute.Binary(op, out.deviceView(), a.deviceView(), b.deviceView()); err != nil {
+		_ = out.Close()
+		return nil, err
 	}
 
 	return out, nil
 }
 
-func binaryContiguous(op string, dst, a, b []float32) error {
-	switch op {
-	case "add":
-		return simdops.Add(dst, a, b)
-	case "sub":
-		return simdops.Sub(dst, a, b)
-	case "mul":
-		return simdops.Mul(dst, a, b)
-	default:
-		return simdops.Div(dst, a, b)
-	}
-}
+func unary(op backend.UnaryOp, a *Tensor) (*Tensor, error) {
+	defer runtime.KeepAlive(a)
 
-// Add allocates the element-wise sum using trailing-dimension broadcasting.
-// Incompatible shapes or uninitialized inputs return an error.
-func Add(a, b *Tensor) (*Tensor, error) { return binary("add", a, b) }
-
-// Sub allocates a-b using trailing-dimension broadcasting, or returns a shape error.
-func Sub(a, b *Tensor) (*Tensor, error) { return binary("sub", a, b) }
-
-// Mul allocates a*b using trailing-dimension broadcasting, or returns a shape error.
-func Mul(a, b *Tensor) (*Tensor, error) { return binary("mul", a, b) }
-
-// Div allocates a/b with broadcasting. Zero division follows IEEE 754;
-// incompatible shapes return an error.
-func Div(a, b *Tensor) (*Tensor, error) { return binary("div", a, b) }
-
-// Scale allocates a tensor with a's shape and values multiplied by factor.
-// Uninitialized inputs return an error; NaNs and infinities propagate.
-func Scale(a *Tensor, factor float32) (*Tensor, error) {
-	if err := valid("scale", a); err != nil {
+	if err := valid("unary", a); err != nil {
 		return nil, err
 	}
 
-	if a.gpu != nil {
-		return gpuUnary("scale", a, factor)
+	compute, ok := a.device.(backend.UnaryBackend)
+	if !ok {
+		return nil, unsupported("unary", a.device)
 	}
 
-	out := a.Contiguous()
+	out, err := allocatedOn(a.shape, a)
+	if err != nil {
+		return nil, err
+	}
 
-	return out, simdops.Scale(out.data, out.data, factor)
+	if err := compute.Unary(op, out.deviceView(), a.deviceView()); err != nil {
+		_ = out.Close()
+		return nil, err
+	}
+
+	return out, nil
 }
 
-// Neg allocates -a with the same shape; invalid inputs return an error.
+func scalar(op backend.ScalarOp, a *Tensor, value float32) (*Tensor, error) {
+	defer runtime.KeepAlive(a)
+
+	if err := valid("scalar", a); err != nil {
+		return nil, err
+	}
+
+	compute, ok := a.device.(backend.ScalarBackend)
+	if !ok {
+		return nil, unsupported("scalar", a.device)
+	}
+
+	out, err := allocatedOn(a.shape, a)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := compute.Scalar(op, out.deviceView(), a.deviceView(), value); err != nil {
+		_ = out.Close()
+		return nil, err
+	}
+
+	return out, nil
+}
+
+// Add allocates the trailing-dimension broadcast sum on the input device.
+func Add(a, b *Tensor) (*Tensor, error) { return binary(backend.Add, a, b) }
+
+// Sub allocates the trailing-dimension broadcast difference on the input device.
+func Sub(a, b *Tensor) (*Tensor, error) { return binary(backend.Sub, a, b) }
+
+// Mul allocates the trailing-dimension broadcast product on the input device.
+func Mul(a, b *Tensor) (*Tensor, error) { return binary(backend.Mul, a, b) }
+
+// Div allocates IEEE Float32 broadcast division on the input device.
+func Div(a, b *Tensor) (*Tensor, error) { return binary(backend.Div, a, b) }
+
+// Scale allocates a times factor on a's device, preserving shape.
+func Scale(a *Tensor, factor float32) (*Tensor, error) { return scalar(backend.Scale, a, factor) }
+
+// Neg allocates the element-wise negation of a on its device.
 func Neg(a *Tensor) (*Tensor, error) { return Scale(a, -1) }
 
-func unary(op string, a *Tensor, f func(float64) float64) (*Tensor, error) {
-	if err := valid(op, a); err != nil {
-		return nil, err
-	}
+// Exp allocates the element-wise exponential, preserving shape and device.
+func Exp(a *Tensor) (*Tensor, error) { return unary(backend.Exp, a) }
 
-	if a.gpu != nil {
-		return gpuUnary(op, a, 0)
-	}
+// Log allocates the element-wise natural logarithm, with IEEE special values.
+func Log(a *Tensor) (*Tensor, error) { return unary(backend.Log, a) }
 
-	out := a.Contiguous()
-	for i, x := range out.data {
-		out.data[i] = float32(f(float64(x)))
-	}
-
-	return out, nil
-}
-
-// Exp allocates exp(a) with the same shape. Overflow produces infinity;
-// invalid inputs return an error.
-func Exp(a *Tensor) (*Tensor, error) { return unary("exp", a, math.Exp) }
-
-// Log allocates the natural logarithm. Zero yields -Inf, negatives yield NaN;
-// invalid inputs return an error.
-func Log(a *Tensor) (*Tensor, error) { return unary("log", a, math.Log) }
-
-// Sqrt allocates sqrt(a). Negative elements yield NaN;
-// invalid inputs return an error.
-func Sqrt(a *Tensor) (*Tensor, error) { return unary("sqrt", a, math.Sqrt) }
+// Sqrt allocates element-wise square roots, with IEEE special values.
+func Sqrt(a *Tensor) (*Tensor, error) { return unary(backend.Sqrt, a) }

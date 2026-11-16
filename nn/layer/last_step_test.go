@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -15,7 +17,7 @@ func TestLastStep_SelectsEachBatchAndRoutesGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Data(), []float32{3, 4, 7, 8}) || !slices.Equal(output.Data().Shape(), []int{2, 2}) {
+	if !slices.Equal(backendtest.HostData(t, output.Data()), []float32{3, 4, 7, 8}) || !slices.Equal(output.Data().Shape(), []int{2, 2}) {
 		t.Fatal(output.Data())
 	}
 
@@ -28,7 +30,7 @@ func TestLastStep_SelectsEachBatchAndRoutesGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{0, 0, 1, 1, 0, 0, 1, 1}) {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{0, 0, 1, 1, 0, 0, 1, 1}) {
 		t.Fatal(input.Grad())
 	}
 }

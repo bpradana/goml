@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -20,7 +22,7 @@ func TestSigmoid_ExtremeInputsRemainFinite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	values := output.Data().Data()
+	values := backendtest.HostData(t, output.Data())
 	if values[0] != 0 || values[1] != 1 || math.IsNaN(float64(values[0])) {
 		t.Fatal(values)
 	}

@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/contrib/nn/yolo"
 	"github.com/bpradana/goml/tensor"
 )
@@ -136,7 +138,7 @@ func TestYOLO_MetalRawHeadsAndDetectionsMatchCPU(t *testing.T) {
 						t.Fatal(err)
 					}
 
-					wanted := expected[scale].Data()
+					wanted := backendtest.HostData(t, expected[scale])
 					maximum := float64(0)
 
 					for index, value := range actual {

@@ -6,6 +6,8 @@ import (
 	"math"
 	"slices"
 	"testing"
+
+	"github.com/bpradana/goml/tensor/backendtest"
 )
 
 func TestPrepare_RGBLetterboxAndNonzeroBounds(t *testing.T) {
@@ -26,7 +28,7 @@ func TestPrepare_RGBLetterboxAndNonzeroBounds(t *testing.T) {
 		t.Fatal(transform, data.Shape())
 	}
 
-	values := data.Data()
+	values := backendtest.HostData(t, data)
 	for channel, want := range []float32{1, 128.0 / 255, 64.0 / 255} {
 		if math.Abs(float64(values[(channel*32+8)*32]-want)) > 1e-6 || values[channel*32*32] != float32(114.0/255) {
 			t.Fatal("RGB normalization or padding mismatch")
@@ -44,7 +46,7 @@ func TestPrepare_BilinearPixelCentersAndOddPadding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	row := data.Data()[transform.top*32 : (transform.top+1)*32]
+	row := backendtest.HostData(t, data)[transform.top*32 : (transform.top+1)*32]
 	for _, test := range []struct {
 		index int
 		want  float32

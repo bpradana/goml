@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/tensor"
@@ -54,7 +56,7 @@ func TestNewModel_NCHWInputProducesLogitsAndParameterGradients(t *testing.T) {
 					t.Fatalf("parameter %d received no gradient", index)
 				}
 
-				for _, gradient := range parameter.Value().Grad().Data() {
+				for _, gradient := range backendtest.HostData(t, parameter.Value().Grad()) {
 					if math.IsNaN(float64(gradient)) || math.IsInf(float64(gradient), 0) {
 						t.Fatalf("parameter %d has nonfinite gradient %g", index, gradient)
 					}
@@ -85,11 +87,11 @@ func TestNewModel_SeededPredictionsAreReproducible(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if iteration > 0 && !slices.Equal(previous, prediction.Data()) {
+				if iteration > 0 && !slices.Equal(previous, backendtest.HostData(t, prediction)) {
 					t.Fatal("identical seeds produced different predictions")
 				}
 
-				previous = prediction.Data()
+				previous = backendtest.HostData(t, prediction)
 
 				for _, parameter := range model.Parameters() {
 					if parameter.Value().Grad() != nil {

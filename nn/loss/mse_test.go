@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -36,7 +38,7 @@ func TestMSE_ForwardThroughInterfaceComputesMeanAndBothGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if output.Data().Rank() != 0 || output.Data().Data()[0] != 2.5 {
+	if output.Data().Rank() != 0 || backendtest.HostData(t, output.Data())[0] != 2.5 {
 		t.Fatalf("got %v, want scalar 2.5", output.Data())
 	}
 
@@ -44,11 +46,11 @@ func TestMSE_ForwardThroughInterfaceComputesMeanAndBothGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(prediction.Grad().Data(), []float32{1, 2}) {
+	if !slices.Equal(backendtest.HostData(t, prediction.Grad()), []float32{1, 2}) {
 		t.Fatalf("prediction gradient: %v", prediction.Grad())
 	}
 
-	if !slices.Equal(target.Grad().Data(), []float32{-1, -2}) {
+	if !slices.Equal(backendtest.HostData(t, target.Grad()), []float32{-1, -2}) {
 		t.Fatalf("target gradient: %v", target.Grad())
 	}
 }

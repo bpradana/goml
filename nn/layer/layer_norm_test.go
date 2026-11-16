@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -23,7 +25,7 @@ func TestLayerNorm_ReferencePopulationVarianceAndAffineTransform(t *testing.T) {
 
 	inverse := 1 / math.Sqrt(2.0/3+1e-5)
 	for i, want := range []float64{-2*inverse + 0.1, 0.2, 4*inverse + 0.3, 0.1, 0.2, 0.3} {
-		if math.Abs(float64(output.Data().Data()[i])-want) > 1e-6 {
+		if math.Abs(float64(backendtest.HostData(t, output.Data())[i])-want) > 1e-6 {
 			t.Fatalf("element %d: %v, want %g", i, output.Data(), want)
 		}
 	}

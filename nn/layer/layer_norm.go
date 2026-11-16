@@ -6,6 +6,7 @@ import (
 
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // LayerNorm normalizes the final dimension, with trainable per-feature scale and
@@ -61,13 +62,29 @@ func (l *LayerNorm) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn: layer norm: expected final dimension %d, got %v", l.features, shape)
 	}
 
-	if !input.Data().IsCPU() {
+	if input.Data().Device().ID() != l.scale.Value().Data().Device().ID() || input.Data().Device().ID() != l.bias.Value().Data().Device().ID() {
+		return nil, fmt.Errorf("nn: layer norm: %w", backend.ErrDeviceMismatch)
+	}
+
+	if !input.Data().HostAccessible() {
 		return l.deviceForward(input)
 	}
 
-	values := input.Data().Data()
-	scales := l.scale.Value().Data().Data()
-	biases := l.bias.Value().Data().Data()
+	values, err := input.Data().HostData()
+	if err != nil {
+		return nil, err
+	}
+
+	scales, err := l.scale.Value().Data().HostData()
+	if err != nil {
+		return nil, err
+	}
+
+	biases, err := l.bias.Value().Data().HostData()
+	if err != nil {
+		return nil, err
+	}
+
 	normalized := make([]float64, len(values))
 	inverse := make([]float64, len(values)/l.features)
 	output := make([]float32, len(values))
@@ -97,13 +114,17 @@ func (l *LayerNorm) Forward(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	data, err := tensor.From(output, shape...)
+	data, err := tensor.FromLike(input.Data(), output, shape...)
 	if err != nil {
 		return nil, err
 	}
 
 	return nn.NewMultiOperation(data, []*nn.Value{input, l.scale.Value(), l.bias.Value()}, func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
-		upstream := g.Data()
+		upstream, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
+
 		dx := make([]float32, len(upstream))
 		dScale := make([]float32, l.features)
 
@@ -126,17 +147,17 @@ func (l *LayerNorm) Forward(input *nn.Value) (*nn.Value, error) {
 			}
 		}
 
-		inputGradient, err := tensor.From(dx, shape...)
+		inputGradient, err := tensor.FromLike(input.Data(), dx, shape...)
 		if err != nil {
 			return nil, err
 		}
 
-		scaleGradient, err := tensor.From(dScale, l.features)
+		scaleGradient, err := tensor.FromLike(input.Data(), dScale, l.features)
 		if err != nil {
 			return nil, err
 		}
 
-		biasGradient, err := tensor.From(dBias, l.features)
+		biasGradient, err := tensor.FromLike(input.Data(), dBias, l.features)
 		if err != nil {
 			return nil, err
 		}

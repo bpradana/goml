@@ -6,6 +6,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -37,3 +39,5 @@ func TestCheckFinite_RejectsNaNInfinityAndLeavesDeviceUsable(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCheckFinite_Conformance(t *testing.T) { backendtest.RunFinite(t, openDevice(t)) }

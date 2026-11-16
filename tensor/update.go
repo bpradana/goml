@@ -3,13 +3,18 @@ package tensor
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"slices"
+
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // SubScaled allocates a-factor*b for equally shaped tensors, including views.
 // The scaled product is rounded to Float32 before subtraction, as with Scale
 // followed by Sub. Invalid inputs or unequal shapes return errors.
 func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
+	defer runtime.KeepAlive([]*Tensor{a, b})
+
 	if err := valid("subscaled", a, b); err != nil {
 		return nil, err
 	}
@@ -22,7 +27,8 @@ func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
 		return nil, err
 	}
 
-	if a.gpu != nil {
+	compute, ok := a.device.(backend.SubScaledBackend)
+	if !ok {
 		scaled, err := Scale(b, factor)
 		if err != nil {
 			return nil, err
@@ -32,20 +38,14 @@ func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
 		return Sub(a, scaled)
 	}
 
-	out, err := allocated(a.shape)
+	out, err := allocatedOn(a.shape, a, b)
 	if err != nil {
 		return nil, err
 	}
 
-	if a.IsContiguous() && b.IsContiguous() {
-		av, bv := a.data[a.offset:a.offset+a.size], b.data[b.offset:b.offset+b.size]
-		for i := range out.data {
-			out.data[i] = av[i] - float32(factor*bv[i])
-		}
-	} else {
-		for i := range out.data {
-			out.data[i] = a.data[a.index(i)] - float32(factor*b.data[b.index(i)])
-		}
+	if err := compute.SubScaled(out.deviceView(), a.deviceView(), b.deviceView(), factor); err != nil {
+		_ = out.Close()
+		return nil, err
 	}
 
 	return out, nil
@@ -57,12 +57,10 @@ func SubScaled(a, b *Tensor, factor float32) (*Tensor, error) {
 // Shapes and moment lengths must match. Step must be positive, rate and epsilon
 // finite and positive, and betas in [0,1). Validation errors leave moments intact.
 func AdamUpdate(values, gradient *Tensor, first, second []float32, rate, beta1, beta2, epsilon float32, step uint64) (*Tensor, error) {
+	defer runtime.KeepAlive([]*Tensor{values, gradient})
+
 	if err := valid("adam", values, gradient); err != nil {
 		return nil, err
-	}
-
-	if values.gpu != nil || gradient.gpu != nil {
-		return nil, fmt.Errorf("tensor: adam: CPU moment slices cannot update GPU values; use tensor operations with GPU moments")
 	}
 
 	if !slices.Equal(values.shape, gradient.shape) || len(first) != values.size || len(second) != values.size {
@@ -74,31 +72,24 @@ func AdamUpdate(values, gradient *Tensor, first, second []float32, rate, beta1, 
 		return nil, fmt.Errorf("tensor: adam: invalid step or hyperparameters")
 	}
 
-	out, err := allocated(values.shape)
+	if err := compatible("adam", values, gradient); err != nil {
+		return nil, err
+	}
+
+	compute, ok := values.device.(backend.HostAdamBackend)
+	if !ok {
+		return nil, unsupported("host Adam", values.device)
+	}
+
+	out, err := allocatedOn(values.shape, values, gradient)
 	if err != nil {
 		return nil, err
 	}
 
-	firstCorrection := 1 - math.Pow(float64(beta1), float64(step))
-	secondCorrection := 1 - math.Pow(float64(beta2), float64(step))
-	valuesContiguous, gradientContiguous := values.IsContiguous(), gradient.IsContiguous()
-
-	for i := range out.data {
-		vi, gi := values.offset+i, gradient.offset+i
-		if !valuesContiguous {
-			vi = values.index(i)
-		}
-
-		if !gradientContiguous {
-			gi = gradient.index(i)
-		}
-
-		g := gradient.data[gi]
-		first[i] = beta1*first[i] + (1-beta1)*g
-		second[i] = beta2*second[i] + (1-beta2)*g*g
-		m := float64(first[i]) / firstCorrection
-		v := float64(second[i]) / secondCorrection
-		out.data[i] = values.data[vi] - float32(float64(rate)*m/(math.Sqrt(v)+float64(epsilon)))
+	options := backend.AdamOptions{Rate: rate, Beta1: beta1, Beta2: beta2, Epsilon: epsilon, Step: step}
+	if err := compute.Adam(out.deviceView(), values.deviceView(), gradient.deviceView(), first, second, options); err != nil {
+		_ = out.Close()
+		return nil, err
 	}
 
 	return out, nil

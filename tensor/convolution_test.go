@@ -40,8 +40,8 @@ func TestCol2Im_StridedOffsetPatchesAndEmptyBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want, err := Col2Im(patches.Contiguous(), shape, 2, 1, 1)
-	if err != nil || !slices.Equal(got.Data(), want.Data()) {
+	want, err := Col2Im(contiguous(t, patches), shape, 2, 1, 1)
+	if err != nil || !slices.Equal(hostData(t, got), hostData(t, want)) {
 		t.Fatal("strided scatter differs", got, want, err)
 	}
 

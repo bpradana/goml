@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -25,7 +27,7 @@ func TestNewMultiOperation_RepeatedInputsAccumulateAndInputListIsCopied(t *testi
 		t.Fatal(err)
 	}
 
-	if x.Grad().Data()[0] != 3 {
+	if backendtest.HostData(t, x.Grad())[0] != 3 {
 		t.Fatalf("gradient %v, want 3", x.Grad())
 	}
 

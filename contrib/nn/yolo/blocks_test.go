@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/layer"
 	"github.com/bpradana/goml/tensor"
@@ -51,7 +53,7 @@ func TestC2f_SplitResidualAndConcatenationOrder(t *testing.T) {
 			want = []float32{1, 2, 3, 4, 6, 8}
 		}
 
-		if !slices.Equal(output.Data().Data(), want) || output.RequiresGrad() || !output.IsInference() {
+		if !slices.Equal(backendtest.HostData(t, output.Data()), want) || output.RequiresGrad() || !output.IsInference() {
 			t.Fatal(output.Data())
 		}
 	}
@@ -69,7 +71,7 @@ func TestSPPF_RepeatedPoolingPreservesBranchOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Data(), []float32{1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4}) || output.RequiresGrad() || !output.IsInference() {
+	if !slices.Equal(backendtest.HostData(t, output.Data()), []float32{1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4}) || output.RequiresGrad() || !output.IsInference() {
 		t.Fatal(output.Data())
 	}
 }

@@ -4,93 +4,150 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"sync/atomic"
+
+	"github.com/bpradana/goml/tensor/backend"
 )
 
-type deviceStorage struct {
-	device Device
-	buffer Buffer
-	refs   atomic.Int64
+type storage struct {
+	mu       sync.Mutex
+	buffer   backend.Buffer
+	refs     int
+	released bool
+	cleanup  runtime.Cleanup
 }
 
-type storageLease struct {
-	storage *deviceStorage
-	closed  atomic.Bool
-	closeMu sync.Mutex
-	scope   *Scope
+func newStorage(buffer backend.Buffer) *storage {
+	allocation := &storage{buffer: buffer}
+	// One cleanup per physical allocation covers abandoned handles without a
+	// cleanup object per view. Explicit Close and Scope are the primary lifetime.
+	managed, ok := buffer.(backend.GCManagedBuffer)
+	if !ok || !managed.GCManaged() {
+		allocation.cleanup = runtime.AddCleanup(allocation, func(buffer backend.Buffer) { _ = buffer.Close() }, buffer)
+	}
+
+	return allocation
 }
 
-func (l *storageLease) close() error {
-	// Cleanup and explicit Close can race. Wait for the winning close to
-	// release its reference before returning from the explicit lifetime boundary.
-	l.closeMu.Lock()
-	defer l.closeMu.Unlock()
+func (s *storage) retain() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if l.closed.Swap(true) {
-		return nil
+	if s.released {
+		return backend.ErrClosed
 	}
 
-	if l.storage.refs.Add(-1) == 0 {
-		return l.storage.buffer.Close()
-	}
+	s.refs++
 
 	return nil
 }
 
-func attachStorage(t *Tensor, storage *deviceStorage, scope *Scope) *Tensor {
-	storage.refs.Add(1)
-	lease := &storageLease{storage: storage, scope: scope}
-	t.gpu = lease
+func (s *storage) release() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.refs--
+	if s.refs != 0 {
+		return nil
+	}
+
+	s.released = true
+	err := s.buffer.Close()
+	s.cleanup.Stop()
+
+	return err
+}
+
+func attachStorage(t *Tensor, allocation *storage, scope *Scope) (*Tensor, error) {
+	if err := allocation.retain(); err != nil {
+		return nil, err
+	}
+
+	t.allocation.Store(allocation)
 
 	if scope != nil {
 		scope.mu.Lock()
+		defer scope.mu.Unlock()
+
 		if scope.closed {
-			_ = lease.close()
-		} else {
-			scope.leases = append(scope.leases, lease)
+			_ = t.Close()
+			return nil, fmt.Errorf("tensor: scope: %w", backend.ErrClosed)
 		}
-		scope.mu.Unlock()
+
+		t.scope.Store(scope)
+		scope.tensors = append(scope.tensors, t)
 	}
 
-	runtime.AddCleanup(t, func(l *storageLease) { _ = l.close() }, lease)
-
-	return t
+	return t, nil
 }
 
-// Device returns nil for CPU storage or the owner of this GPU allocation.
-func (t *Tensor) Device() Device {
-	if t == nil || t.gpu == nil {
-		return nil
-	}
-
-	return t.gpu.storage.device
-}
-
-// IsCPU reports whether values reside in Go-managed CPU storage.
-func (t *Tensor) IsCPU() bool {
-	return t != nil && t.gpu == nil
-}
-
-// Close releases this tensor's GPU lease. Other views keep their own leases.
-// CPU Close is a no-op. Closed GPU tensors retain metadata but reject execution.
+// Close releases this handle on every device. Other retained views remain valid.
+// Metadata remains readable. Repeated or concurrent Close waits for the winning
+// release. Queued device operations retain physical allocations independently.
 func (t *Tensor) Close() error {
-	if t == nil || t.gpu == nil {
+	if t == nil {
 		return nil
 	}
 
-	return t.gpu.close()
+	t.closeMu.Lock()
+	defer t.closeMu.Unlock()
+
+	allocation := t.allocation.Swap(nil)
+	if allocation == nil {
+		return nil
+	}
+
+	return allocation.release()
 }
 
-func (t *Tensor) deviceView() DeviceView {
-	return DeviceView{Buffer: t.gpu.storage.buffer, Shape: t.shape, Strides: t.strides, Offset: t.offset}
+// IsClosed reports a closed or uninitialized handle, buffer, or owning device.
+func (t *Tensor) IsClosed() bool {
+	if t == nil {
+		return true
+	}
+
+	allocation := t.allocation.Load()
+
+	return allocation == nil || allocation.buffer.Valid() != nil
+}
+
+func (t *Tensor) deviceView() backend.View {
+	allocation := t.allocation.Load()
+	if allocation == nil {
+		return backend.View{}
+	}
+
+	return backend.View{Buffer: allocation.buffer, Shape: t.shape, Strides: t.strides, Offset: t.offset}
+}
+
+// Retain creates an independent handle sharing immutable storage and metadata.
+// Closing either handle does not invalidate the other. The returned handle is
+// unscoped; its caller owns Close. No data transfer or numerical copy occurs.
+func (t *Tensor) Retain() (*Tensor, error) {
+	if err := valid("retain", t); err != nil {
+		return nil, err
+	}
+
+	return t.share(&Tensor{shape: t.shape, strides: t.strides, offset: t.offset, size: t.size}, nil)
+}
+
+func (t *Tensor) share(view *Tensor, scope *Scope) (*Tensor, error) {
+	defer runtime.KeepAlive(t)
+
+	allocation := t.allocation.Load()
+	if allocation == nil {
+		return nil, backend.ErrClosed
+	}
+
+	view.device = t.device
+
+	return attachStorage(view, allocation, scope)
 }
 
 func compatible(op string, inputs ...*Tensor) error {
-	first := inputs[0].Device()
+	first := inputs[0].device
 	for _, input := range inputs[1:] {
-		other := input.Device()
-		if (first == nil) != (other == nil) || (first != nil && first.ID() != other.ID()) {
-			return fmt.Errorf("tensor: %s: incompatible devices", op)
+		if first.ID() != input.device.ID() {
+			return fmt.Errorf("tensor: %s: %w (%s and %s)", op, backend.ErrDeviceMismatch, first.ID(), input.device.ID())
 		}
 	}
 
@@ -98,50 +155,54 @@ func compatible(op string, inputs ...*Tensor) error {
 }
 
 func allocatedOn(shape []int, inputs ...*Tensor) (*Tensor, error) {
-	device := inputs[0].Device()
-	if device == nil {
-		return allocated(shape)
-	}
-
 	var scope *Scope
 	for _, input := range inputs {
-		if input.gpu != nil && input.gpu.scope != nil {
-			scope = input.gpu.scope
+		if s := input.scope.Load(); s != nil {
+			scope = s
 			break
 		}
 	}
 
-	return allocateDevice(device, scope, shape)
+	return allocateDevice(inputs[0].device, scope, shape)
 }
 
-// Scope explicitly owns temporary GPU tensors created from its input tensors.
-// Operations propagate the scope from their inputs. Keep detaches an output's
-// lease before Close. A scope may be used by multiple goroutines; synchronize
-// those goroutines before closing it. CPU tensors do not need a scope.
+// Scope owns temporary tensor handles on one device. Operations propagate it
+// from their inputs. Keep detaches an output before closing the scope. Finish all
+// goroutines using scoped tensors before Close. Physical queued work may finish
+// later because asynchronous backends retain their native resources.
 type Scope struct {
-	device Device
-	mu     sync.Mutex
-	leases []*storageLease
-	closed bool
+	device  backend.Device
+	mu      sync.Mutex
+	tensors []*Tensor
+	closed  bool
 }
 
-// NewScope creates a lifetime boundary on device. It performs no allocation.
-func NewScope(device Device) (*Scope, error) {
+// NewScope creates a lifetime boundary without allocating numerical storage.
+func NewScope(device backend.Device) (*Scope, error) {
 	if device == nil {
-		return nil, fmt.Errorf("tensor: scope: GPU device required")
+		return nil, fmt.Errorf("tensor: scope: device required")
 	}
 
 	return &Scope{device: device}, nil
 }
 
-// To transfers or aliases input onto this scope's device. The returned tensor
-// has an independent lease and is invalidated by Close unless kept explicitly.
+// To returns a scoped independent handle on the scope's device. Same-device
+// values share immutable storage; cross-device values are explicitly copied.
 func (s *Scope) To(input *Tensor) (*Tensor, error) {
-	if s == nil || s.device == nil {
-		return nil, fmt.Errorf("tensor: scope: use NewScope before To")
+	if s == nil {
+		return nil, fmt.Errorf("tensor: scope: use NewScope")
 	}
 
-	result, err := input.To(s.device)
+	var (
+		result *Tensor
+		err    error
+	)
+	if input != nil && input.Device() != nil && input.Device().ID() == s.device.ID() {
+		result, err = input.Retain()
+	} else {
+		result, err = input.To(s.device)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -151,30 +212,33 @@ func (s *Scope) To(input *Tensor) (*Tensor, error) {
 
 	if s.closed {
 		_ = result.Close()
-		return nil, fmt.Errorf("tensor: scope: already closed")
+		return nil, backend.ErrClosed
 	}
 
-	result.gpu.scope = s
-	s.leases = append(s.leases, result.gpu)
+	result.scope.Store(s)
+	s.tensors = append(s.tensors, result)
 
 	return result, nil
 }
 
-// Keep preserves this tensor's lease beyond its scope. Close remains the
-// caller's responsibility. Each storage-sharing view owns its own lease.
+// Keep detaches this handle from its scope. The caller then owns Close.
 func (t *Tensor) Keep() {
-	if t == nil || t.gpu == nil || t.gpu.scope == nil {
+	if t == nil {
 		return
 	}
 
-	scope := t.gpu.scope
-	scope.mu.Lock()
-	t.gpu.scope = nil
-	scope.mu.Unlock()
+	s := t.scope.Load()
+	if s == nil {
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	t.scope.CompareAndSwap(s, nil)
 }
 
-// Close releases all unkept temporary leases. It does not wait for the GPU;
-// pending native commands retain their resources until completion.
+// Close releases every unkept handle. Repeated Close is harmless.
 func (s *Scope) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -187,21 +251,15 @@ func (s *Scope) Close() error {
 
 	var first error
 
-	for _, lease := range s.leases {
-		if lease.scope == s {
-			if err := lease.close(); err != nil && first == nil {
+	for _, t := range s.tensors {
+		if t.scope.Load() == s {
+			if err := t.Close(); err != nil && first == nil {
 				first = err
 			}
 		}
 	}
 
-	s.leases = nil
+	s.tensors = nil
 
 	return first
-}
-
-// IsClosed reports whether this GPU tensor or its device has been closed.
-// CPU tensors do not have a closeable allocation and return false.
-func (t *Tensor) IsClosed() bool {
-	return t != nil && t.gpu != nil && (t.gpu.closed.Load() || t.gpu.storage.buffer.Valid() != nil)
 }

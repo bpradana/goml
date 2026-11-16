@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -44,7 +46,7 @@ func TestTransformerEncoder_ZeroProjectionsLeaveResidualInputAndCompose(t *testi
 	}
 
 	positioned, err := NewPositionalEncoding().Forward(input)
-	if err != nil || !slices.Equal(output.Data(), positioned.Data().Data()) {
+	if err != nil || !slices.Equal(backendtest.HostData(t, output), backendtest.HostData(t, positioned.Data())) {
 		t.Fatalf("residual changed input: %v %v", output, err)
 	}
 

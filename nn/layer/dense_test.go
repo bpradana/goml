@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -21,7 +23,7 @@ func TestNewDense_SeededInitializationIsReproducible(t *testing.T) {
 	}
 
 	for i, p := range a.Parameters() {
-		if !slices.Equal(p.Value().Data().Data(), b.Parameters()[i].Value().Data().Data()) {
+		if !slices.Equal(backendtest.HostData(t, p.Value().Data()), backendtest.HostData(t, b.Parameters()[i].Value().Data())) {
 			t.Fatal("seeded parameters differ")
 		}
 	}
@@ -62,7 +64,7 @@ func TestDense_ForwardAndParameterGradients(t *testing.T) {
 	}
 
 	output, err := dense.Forward(input)
-	if err != nil || output.Data().Data()[0] != 24 {
+	if err != nil || backendtest.HostData(t, output.Data())[0] != 24 {
 		t.Fatalf("forward: %v %v", output, err)
 	}
 
@@ -75,9 +77,9 @@ func TestDense_ForwardAndParameterGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(dense.weight.Value().Grad().Data(), []float32{4, 5}) ||
-		dense.bias.Value().Grad().Data()[0] != 1 ||
-		!slices.Equal(input.Grad().Data(), []float32{2, 3}) {
+	if !slices.Equal(backendtest.HostData(t, dense.weight.Value().Grad()), []float32{4, 5}) ||
+		backendtest.HostData(t, dense.bias.Value().Grad())[0] != 1 ||
+		!slices.Equal(backendtest.HostData(t, input.Grad()), []float32{2, 3}) {
 		t.Fatal("incorrect dense gradients")
 	}
 }

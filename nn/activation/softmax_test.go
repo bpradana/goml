@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -22,7 +24,7 @@ func TestSoftmax_LargeLogitsAndMaskedNegativeInfinity(t *testing.T) {
 	}
 
 	want := []float64{1 / (1 + math.E), math.E / (1 + math.E), 0}
-	for i, got := range output.Data().Data() {
+	for i, got := range backendtest.HostData(t, output.Data()) {
 		if math.Abs(float64(got)-want[i]) > 1e-6 {
 			t.Fatalf("probability %d: got %g, want %g", i, got, want[i])
 		}
@@ -55,7 +57,7 @@ func TestSoftmax_ArbitraryAxisWeightedGradientsMatchFiniteDifferences(t *testing
 				t.Fatal(err)
 			}
 
-			for index, got := range input.Grad().Data() {
+			for index, got := range backendtest.HostData(t, input.Grad()) {
 				objectives := [2]float64{}
 
 				for side, delta := range []float32{-1e-3, 1e-3} {
@@ -67,7 +69,7 @@ func TestSoftmax_ArbitraryAxisWeightedGradientsMatchFiniteDifferences(t *testing
 						t.Fatal(err)
 					}
 
-					for i, value := range result.Data().Data() {
+					for i, value := range backendtest.HostData(t, result.Data()) {
 						objectives[side] += float64(value) * float64(weights[i])
 					}
 				}

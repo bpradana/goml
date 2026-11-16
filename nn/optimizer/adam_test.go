@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/nn/layer"
@@ -37,7 +39,7 @@ func TestAdam_MultipleStepsMatchIndependentReference(t *testing.T) {
 		v := second / (1 - math.Pow(0.999, float64(step+1)))
 		want -= 0.01 * m / (math.Sqrt(v) + 1e-8)
 
-		got := parameter.Value().Data().Data()[0]
+		got := backendtest.HostData(t, parameter.Value().Data())[0]
 		if math.Abs(float64(got)-want) > 2e-6 {
 			t.Fatalf("step %d: got %g, want %g", step+1, got, want)
 		}
@@ -60,7 +62,14 @@ func TestAdam_MissingGradientsDoNotAdvanceState(t *testing.T) {
 		t.Fatal("missing gradient allocated moment state")
 	}
 
-	leaf, previous := parameter.Value(), parameter.Value().Data()
+	leaf := parameter.Value()
+
+	previous, err := leaf.Data().Retain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = previous.Close() }()
+
 	accumulateGradient(t, parameter, []float32{2})
 
 	if err := opt.Step(); err != nil {
@@ -80,7 +89,7 @@ func TestAdam_MissingGradientsDoNotAdvanceState(t *testing.T) {
 		t.Fatal("missing gradient advanced existing state")
 	}
 
-	if parameter.Value() != leaf || previous.Data()[0] != 1 {
+	if parameter.Value() != leaf || backendtest.HostData(t, previous)[0] != 1 {
 		t.Fatal("update changed parameter identity or previous tensor")
 	}
 }
@@ -177,8 +186,8 @@ func TestAdam_DenseNetworkLearnsXOR(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i, got := range prediction.Data() {
-		want := targetData.Data()[i]
+	for i, got := range backendtest.HostData(t, prediction) {
+		want := backendtest.HostData(t, targetData)[i]
 		if math.Abs(float64(got-want)) > 0.1 {
 			t.Fatalf("XOR example %d: got %g, want %g", i, got, want)
 		}

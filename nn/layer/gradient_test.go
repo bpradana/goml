@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -94,7 +96,7 @@ func checkLayerGradients(t *testing.T, stage Layer, values []float32, shape []in
 		}
 
 		sum := float64(0)
-		for i, value := range result.Data().Data() {
+		for i, value := range backendtest.HostData(t, result.Data()) {
 			sum += float64(value) * float64(weights[i])
 		}
 
@@ -103,7 +105,7 @@ func checkLayerGradients(t *testing.T, stage Layer, values []float32, shape []in
 
 	const epsilon float32 = 1e-3
 
-	for i, got := range input.Grad().Data() {
+	for i, got := range backendtest.HostData(t, input.Grad()) {
 		perturbed := slices.Clone(values)
 		perturbed[i] += epsilon
 		plus := evaluate(perturbed)
@@ -117,8 +119,8 @@ func checkLayerGradients(t *testing.T, stage Layer, values []float32, shape []in
 			t.Fatalf("parameter %d received no gradient", index)
 		}
 
-		original := parameter.Value().Data().Data()
-		for i, got := range parameter.Value().Grad().Data() {
+		original := backendtest.HostData(t, parameter.Value().Data())
+		for i, got := range backendtest.HostData(t, parameter.Value().Grad()) {
 			perturbed := slices.Clone(original)
 			perturbed[i] += epsilon
 			setParameter(t, parameter, perturbed)

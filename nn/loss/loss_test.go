@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -48,7 +50,7 @@ func checkLossGradient(
 		t.Fatal(err)
 	}
 
-	gradient := input.Grad().Data()
+	gradient := backendtest.HostData(t, input.Grad())
 
 	const epsilon float32 = 1e-3
 
@@ -64,7 +66,7 @@ func checkLossGradient(
 				t.Fatal(err)
 			}
 
-			objectives[j] = result.Data().Data()[0]
+			objectives[j] = backendtest.HostData(t, result.Data())[0]
 		}
 
 		want := float64((objectives[1] - objectives[0]) / (2 * epsilon))

@@ -6,14 +6,15 @@ import (
 	"github.com/bpradana/goml/nn"
 
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 type adamState struct {
-	gpuFirst  *tensor.Tensor
-	gpuSecond *tensor.Tensor
-	first     []float32
-	second    []float32
-	steps     uint64
+	deviceFirst  *tensor.Tensor
+	deviceSecond *tensor.Tensor
+	first        []float32
+	second       []float32
+	steps        uint64
 }
 
 // Adam owns first and second moment estimates for its parameters.
@@ -59,8 +60,10 @@ func (a *Adam) Step() error {
 		return fmt.Errorf("nn: adam: use NewAdam to initialize the optimizer")
 	}
 
-	if len(a.parameters) > 0 && a.parameters[0].Value().Data().Device() != nil {
-		return a.deviceStep()
+	if len(a.parameters) > 0 {
+		if _, ok := a.parameters[0].Value().Data().Device().(backend.HostAdamBackend); !ok {
+			return a.deviceStep()
+		}
 	}
 
 	for _, parameter := range a.parameters {

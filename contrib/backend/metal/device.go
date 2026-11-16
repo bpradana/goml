@@ -9,7 +9,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // Device owns one native Metal device, queue, shader cache, and buffer registry.
@@ -22,13 +22,6 @@ type Device struct {
 	id      string
 	buffers map[*buffer]struct{}
 	closed  bool
-}
-
-type buffer struct {
-	owner  *Device
-	handle unsafe.Pointer
-	length int
-	closed bool
 }
 
 // Stats records native allocation bytes, including buffers retained by queued
@@ -82,17 +75,21 @@ func (d *Device) ID() string {
 
 // Allocate creates uninitialized persistent Float32 storage. Zero elements are
 // supported. Allocation limits and closed-device failures return errors.
-func (d *Device) Allocate(elements int) (tensor.Buffer, error) {
+func (d *Device) Allocate(elements int) (backend.Buffer, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	if d.closed || d.handle == nil || elements < 0 || uint64(elements) > uint64(^uint32(0)) {
-		return nil, fmt.Errorf("metal: allocation: closed device or invalid element count")
+		if d.closed || d.handle == nil {
+			return nil, fmt.Errorf("metal: allocation: %w", backend.ErrClosed)
+		}
+
+		return nil, fmt.Errorf("metal: allocation: %w", backend.ErrAllocation)
 	}
 
 	handle, err := nativeAllocate(d.handle, uint64(elements)*4)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("metal: allocate: %w: %w", backend.ErrAllocation, err)
 	}
 
 	result := &buffer{owner: d, handle: handle, length: elements}
@@ -101,55 +98,9 @@ func (d *Device) Allocate(elements int) (tensor.Buffer, error) {
 	return result, nil
 }
 
-func (b *buffer) Len() int {
-	return b.length
-}
-
-func (b *buffer) DeviceID() string {
-	return b.owner.id
-}
-
-func (b *buffer) Valid() error {
-	b.owner.mu.Lock()
-	defer b.owner.mu.Unlock()
-
-	if b.closed || b.owner.closed {
-		return fmt.Errorf("metal: closed buffer or device")
-	}
-
-	return nil
-}
-
-func (b *buffer) Close() error {
-	b.owner.mu.Lock()
-	defer b.owner.mu.Unlock()
-
-	b.close()
-
-	return nil
-}
-
-func (b *buffer) close() {
-	if !b.closed {
-		nativeRelease(b.handle)
-		b.closed = true
-		b.handle = nil
-		delete(b.owner.buffers, b)
-	}
-}
-
-func (d *Device) checked(value tensor.Buffer) (*buffer, error) {
-	b, ok := value.(*buffer)
-	if !ok || b == nil || d.handle == nil || b.owner != d || b.closed || d.closed {
-		return nil, fmt.Errorf("metal: invalid, foreign, or closed buffer")
-	}
-
-	return b, nil
-}
-
 // Upload copies exactly one buffer's Float32 values into native storage. It
 // synchronizes prior commands before modifying storage, preventing host races.
-func (d *Device) Upload(dst tensor.Buffer, values []float32) error {
+func (d *Device) Upload(dst backend.Buffer, values []float32) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -159,14 +110,14 @@ func (d *Device) Upload(dst tensor.Buffer, values []float32) error {
 	}
 
 	if len(values) != b.length {
-		return fmt.Errorf("metal: upload length mismatch")
+		return fmt.Errorf("%w: Metal upload length", backend.ErrInvalidView)
 	}
 
 	return nativeUpload(d.handle, b.handle, values)
 }
 
 // Download synchronizes and copies a buffer into the caller-owned destination.
-func (d *Device) Download(src tensor.Buffer, values []float32) error {
+func (d *Device) Download(src backend.Buffer, values []float32) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -176,7 +127,7 @@ func (d *Device) Download(src tensor.Buffer, values []float32) error {
 	}
 
 	if len(values) != b.length {
-		return fmt.Errorf("metal: download length mismatch")
+		return fmt.Errorf("%w: Metal download length", backend.ErrInvalidView)
 	}
 
 	return nativeDownload(d.handle, b.handle, values)
@@ -188,7 +139,7 @@ func (d *Device) Synchronize() error {
 	defer d.mu.Unlock()
 
 	if d.closed {
-		return fmt.Errorf("metal: closed device")
+		return fmt.Errorf("metal: %w", backend.ErrClosed)
 	}
 
 	return nativeSync(d.handle)

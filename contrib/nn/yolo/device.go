@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bpradana/goml/nn"
-	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 func (m *Model) parameters() []*nn.Parameter {
@@ -27,7 +27,7 @@ func (m *Model) parameters() []*nn.Parameter {
 // ToDevice explicitly transfers all model weights, preserving shared parameter
 // identity. A nil device selects CPU. Transfers are atomic and must be externally
 // synchronized against inference. Load always constructs a CPU model first.
-func (m *Model) ToDevice(device tensor.Device) error {
+func (m *Model) ToDevice(device backend.Device) error {
 	if m == nil || len(m.classes) == 0 {
 		return fmt.Errorf("yolo: transfer: uninitialized model")
 	}
@@ -36,7 +36,7 @@ func (m *Model) ToDevice(device tensor.Device) error {
 }
 
 // Device returns the current weight device, or nil for CPU or an empty model.
-func (m *Model) Device() tensor.Device {
+func (m *Model) Device() backend.Device {
 	if m == nil || len(m.classes) == 0 || m.stages[0] == nil {
 		return nil
 	}

@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -46,7 +48,7 @@ func checkGradient(t *testing.T, values []float32, forward func(*nn.Value) (*nn.
 
 	const epsilon float32 = 1e-3
 
-	for i, got := range input.Grad().Data() {
+	for i, got := range backendtest.HostData(t, input.Grad()) {
 		var objectives [2]float32
 
 		for j, delta := range []float32{-epsilon, epsilon} {
@@ -63,7 +65,7 @@ func checkGradient(t *testing.T, values []float32, forward func(*nn.Value) (*nn.
 				t.Fatal(err)
 			}
 
-			objectives[j] = total.Data()[0]
+			objectives[j] = backendtest.HostData(t, total)[0]
 		}
 
 		want := float64((objectives[1] - objectives[0]) / (2 * epsilon))

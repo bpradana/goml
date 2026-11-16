@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -38,12 +40,12 @@ func TestLSTM_ReferenceGatesAndExplicitState(t *testing.T) {
 		c = f*c + i*candidate
 
 		h = o * math.Tanh(c)
-		if math.Abs(float64(output.Data().Data()[step])-h) > 1e-6 {
+		if math.Abs(float64(backendtest.HostData(t, output.Data())[step])-h) > 1e-6 {
 			t.Fatalf("step %d: got %v, want %g", step, output.Data(), h)
 		}
 	}
 
-	if math.Abs(float64(lastCell.Data().Data()[0])-c) > 1e-6 || math.Abs(float64(lastHidden.Data().Data()[0])-h) > 1e-6 {
+	if math.Abs(float64(backendtest.HostData(t, lastCell.Data())[0])-c) > 1e-6 || math.Abs(float64(backendtest.HostData(t, lastHidden.Data())[0])-h) > 1e-6 {
 		t.Fatal("incorrect final states")
 	}
 
@@ -57,7 +59,7 @@ func TestLSTM_ReferenceGatesAndExplicitState(t *testing.T) {
 	}
 
 	for _, state := range []*nn.Value{hidden, cell} {
-		original := state.Data().Data()[0]
+		original := backendtest.HostData(t, state.Data())[0]
 		results := [2]float32{}
 
 		for i, delta := range []float32{-1e-3, 1e-3} {
@@ -75,10 +77,10 @@ func TestLSTM_ReferenceGatesAndExplicitState(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			results[i] = result.Data().Data()[0]
+			results[i] = backendtest.HostData(t, result.Data())[0]
 		}
 
-		assertDerivative(t, "initial state", 0, state.Grad().Data()[0], float64((results[1]-results[0])/0.002))
+		assertDerivative(t, "initial state", 0, backendtest.HostData(t, state.Grad())[0], float64((results[1]-results[0])/0.002))
 	}
 }
 
@@ -88,7 +90,7 @@ func TestLSTM_BatchedSequenceAndPackedParametersMatchFiniteDifferences(t *testin
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(recurrent.Parameters()[1].Value().Data().Data(), []float32{0, 0, 1, 1, 0, 0, 0, 0}) {
+	if !slices.Equal(backendtest.HostData(t, recurrent.Parameters()[1].Value().Data()), []float32{0, 0, 1, 1, 0, 0, 0, 0}) {
 		t.Fatal("forget gate bias was not initialized to one")
 	}
 

@@ -10,7 +10,7 @@ func TestViews_PreserveValuesAndStorageOwnership(t *testing.T) {
 	input[0] = 99
 	a.Shape()[0] = 99
 	a.Strides()[0] = 99
-	a.Data()[0] = 99
+	hostData(t, a)[0] = 99
 	assertData(t, a, []int{2, 3}, []float32{1, 2, 3, 4, 5, 6})
 
 	transposed, err := a.Transpose()
@@ -28,10 +28,10 @@ func TestViews_PreserveValuesAndStorageOwnership(t *testing.T) {
 		t.Fatal("noncontiguous reshape must fail")
 	}
 
-	contiguous := transposed.Contiguous()
-	assertData(t, contiguous, []int{3, 2}, transposed.Data())
+	contiguous := contiguous(t, transposed)
+	assertData(t, contiguous, []int{3, 2}, hostData(t, transposed))
 
-	if &contiguous.data[0] == &a.data[0] {
+	if contiguous.deviceView().Buffer == a.deviceView().Buffer {
 		t.Fatal("contiguous did not copy")
 	}
 
@@ -42,7 +42,7 @@ func TestViews_PreserveValuesAndStorageOwnership(t *testing.T) {
 
 	assertData(t, sliced, []int{2, 2}, []float32{2, 5, 3, 6})
 
-	if &sliced.data[0] != &a.data[0] {
+	if sliced.deviceView().Buffer != a.deviceView().Buffer {
 		t.Fatal("slice must share storage")
 	}
 
@@ -51,7 +51,7 @@ func TestViews_PreserveValuesAndStorageOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if &reshaped.data[0] != &a.data[0] {
+	if reshaped.deviceView().Buffer != a.deviceView().Buffer {
 		t.Fatal("reshape must share storage")
 	}
 
@@ -103,7 +103,7 @@ func FuzzViews(f *testing.F) {
 		}
 
 		assertData(t, roundTrip, []int{m, n}, data)
-		assertData(t, transposed.Contiguous(), []int{n, m}, transposed.Data())
+		assertData(t, contiguous(t, transposed), []int{n, m}, hostData(t, transposed))
 
 		start, end := int(start8)-1, int(end8)-1
 		slice, err := transposed.Slice(0, start, end)
@@ -116,8 +116,19 @@ func FuzzViews(f *testing.F) {
 			return
 		}
 
-		if err != nil || len(slice.Data()) != (end-start)*m {
+		if err != nil || len(hostData(t, slice)) != (end-start)*m {
 			t.Fatalf("valid slice failed: %v", err)
 		}
 	})
+}
+
+func contiguous(t testing.TB, value *Tensor) *Tensor {
+	t.Helper()
+
+	output, err := value.MakeContiguous()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return output
 }

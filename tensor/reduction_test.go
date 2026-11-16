@@ -65,7 +65,7 @@ func TestReductions_StridedAndContiguousGroups(t *testing.T) {
 					}
 				}
 
-				if !slices.Equal(got.Data(), want) {
+				if !slices.Equal(hostData(t, got), want) {
 					t.Fatal(strided, axes, operation.name, got, want)
 				}
 			}
@@ -152,7 +152,7 @@ func TestMax_PropagatesNaN(t *testing.T) {
 	a := fromTest(t, []float32{1, float32(math.NaN())}, 2)
 
 	result, err := Max(a)
-	if err != nil || !math.IsNaN(float64(result.Data()[0])) {
+	if err != nil || !math.IsNaN(float64(hostData(t, result)[0])) {
 		t.Fatalf("got %v, want NaN: %v", result, err)
 	}
 }

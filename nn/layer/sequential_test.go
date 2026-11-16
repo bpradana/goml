@@ -4,6 +4,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/tensor"
@@ -90,7 +92,7 @@ func TestSequential_ActivationConstructorsImplementLayer(t *testing.T) {
 			}
 
 			output, err := model.Forward(input)
-			if err != nil || output.Data().Data()[0] != tt.want {
+			if err != nil || backendtest.HostData(t, output.Data())[0] != tt.want {
 				t.Fatalf("got %v, want %g: %v", output, tt.want, err)
 			}
 

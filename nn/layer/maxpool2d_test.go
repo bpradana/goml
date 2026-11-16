@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -21,7 +23,7 @@ func TestMaxPool2D_PaddedNegativeInputsAndOverlappingGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Data(), []float32{-2, -2, -2, -2}) {
+	if !slices.Equal(backendtest.HostData(t, output.Data()), []float32{-2, -2, -2, -2}) {
 		t.Fatal(output.Data())
 	}
 
@@ -30,7 +32,7 @@ func TestMaxPool2D_PaddedNegativeInputsAndOverlappingGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{0, 4, 0, 0}) {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{0, 4, 0, 0}) {
 		t.Fatal(input.Grad())
 	}
 
@@ -57,12 +59,12 @@ func TestMaxPool2D_TiesInfinityAndNaN(t *testing.T) {
 		if math.IsNaN(float64(values[1])) {
 			want = []float32{0, 1, 0, 0}
 
-			if !math.IsNaN(float64(output.Data().Data()[0])) {
+			if !math.IsNaN(float64(backendtest.HostData(t, output.Data())[0])) {
 				t.Fatal("NaN did not propagate")
 			}
 		}
 
-		if !slices.Equal(input.Grad().Data(), want) {
+		if !slices.Equal(backendtest.HostData(t, input.Grad()), want) {
 			t.Fatal(input.Grad())
 		}
 	}
@@ -77,7 +79,7 @@ func TestMaxPool2D_MultipleChannelsStrideAndEmptyBatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Shape(), []int{1, 2, 1, 1}) || !slices.Equal(output.Data().Data(), []float32{5, 11}) {
+	if !slices.Equal(output.Data().Shape(), []int{1, 2, 1, 1}) || !slices.Equal(backendtest.HostData(t, output.Data()), []float32{5, 11}) {
 		t.Fatal(output.Data())
 	}
 
@@ -100,7 +102,7 @@ func TestMaxPool2D_RejectsInvalidGeometryAndInput(t *testing.T) {
 
 	for _, shape := range [][]int{{1, 2}, {1, 1, 0, 2}, {1, 1, 2, 2}} {
 		data, _ := tensor.Zeros(shape...)
-		if _, err := pool.Forward(layerValue(t, data.Data(), shape, false)); err == nil {
+		if _, err := pool.Forward(layerValue(t, backendtest.HostData(t, data), shape, false)); err == nil {
 			t.Fatal(shape)
 		}
 	}

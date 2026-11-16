@@ -2,56 +2,50 @@ package tensor
 
 import (
 	"fmt"
-	"math"
+	"runtime"
 	"slices"
+
+	"github.com/bpradana/goml/tensor/backend"
 )
 
-// Activation computes relu, sigmoid, tanh, or silu on the input device.
-// The result owns independent storage and preserves the input shape.
+func activationOp(kind string, derivative bool) (backend.UnaryOp, error) {
+	var op backend.UnaryOp
+
+	switch kind {
+	case "relu":
+		op = backend.ReLU
+	case "sigmoid":
+		op = backend.Sigmoid
+	case "tanh":
+		op = backend.Tanh
+	case "silu":
+		op = backend.SiLU
+	default:
+		return 0, fmt.Errorf("tensor: unknown activation %q", kind)
+	}
+
+	if derivative {
+		op += backend.ReLUGrad - backend.ReLU
+	}
+
+	return op, nil
+}
+
+// Activation allocates relu, sigmoid, tanh, or silu on input's device.
 func Activation(kind string, input *Tensor) (*Tensor, error) {
-	if err := valid("activation", input); err != nil {
+	op, err := activationOp(kind, false)
+	if err != nil {
 		return nil, err
 	}
 
-	if kind != "relu" && kind != "sigmoid" && kind != "tanh" && kind != "silu" {
-		return nil, fmt.Errorf("tensor: unknown activation %q", kind)
-	}
-
-	if input.gpu != nil {
-		return gpuUnary(kind, input, 0)
-	}
-
-	return unary(kind, input, func(x float64) float64 {
-		switch kind {
-		case "relu":
-			return math.Max(0, x)
-		case "tanh":
-			return math.Tanh(x)
-		}
-
-		var probability float64
-		if x >= 0 {
-			probability = 1 / (1 + math.Exp(-x))
-		} else {
-			e := math.Exp(x)
-			probability = e / (1 + e)
-		}
-
-		if kind == "sigmoid" {
-			return probability
-		}
-
-		if math.IsInf(x, -1) {
-			return math.Copysign(0, -1)
-		}
-
-		return x * probability
-	})
+	return unary(op, input)
 }
 
-// ActivationBackward computes an activation's input derivative times gradient.
-// Inputs must have matching shapes and devices. It does not build a graph.
+// ActivationBackward multiplies the input derivative by an equally shaped
+// gradient. Values remain on-device; saved derivative storage is released.
 func ActivationBackward(kind string, input, gradient *Tensor) (*Tensor, error) {
+	defer runtime.KeepAlive([]*Tensor{input, gradient})
+
 	if err := valid("activation backward", input, gradient); err != nil {
 		return nil, err
 	}
@@ -61,81 +55,24 @@ func ActivationBackward(kind string, input, gradient *Tensor) (*Tensor, error) {
 	}
 
 	if !slices.Equal(input.shape, gradient.shape) {
-		return nil, fmt.Errorf("tensor: activation backward: gradient shape %v must match %v", gradient.shape, input.shape)
+		return nil, fmt.Errorf("tensor: activation backward: shapes %v and %v differ", input.shape, gradient.shape)
 	}
 
-	if kind != "relu" && kind != "sigmoid" && kind != "tanh" && kind != "silu" {
-		return nil, fmt.Errorf("tensor: unknown activation %q", kind)
-	}
-
-	if input.gpu == nil {
-		derivative, err := unary("activation backward", input, func(x float64) float64 {
-			if kind == "relu" {
-				if math.IsNaN(x) {
-					return x
-				}
-
-				if x > 0 {
-					return 1
-				}
-
-				return 0
-			}
-
-			if kind == "tanh" {
-				y := math.Tanh(x)
-				return 1 - y*y
-			}
-
-			var probability float64
-			if x >= 0 {
-				probability = 1 / (1 + math.Exp(-x))
-			} else {
-				e := math.Exp(x)
-				probability = e / (1 + e)
-			}
-
-			if kind == "sigmoid" {
-				return probability * (1 - probability)
-			}
-
-			if math.IsInf(x, 0) {
-				return probability
-			}
-
-			return probability + x*probability*(1-probability)
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		return Mul(derivative, gradient)
-	}
-
-	derivative, err := gpuUnary(kind+"_grad", input, 0)
+	op, err := activationOp(kind, true)
 	if err != nil {
 		return nil, err
 	}
 
+	derivative, err := unary(op, input)
+	if err != nil {
+		return nil, err
+	}
 	defer func() { _ = derivative.Close() }()
 
 	return Mul(derivative, gradient)
 }
 
-// AddScalar adds a host scalar without transferring tensor data.
+// AddScalar allocates input plus a host scalar, preserving shape and device.
 func AddScalar(input *Tensor, value float32) (*Tensor, error) {
-	if err := valid("add scalar", input); err != nil {
-		return nil, err
-	}
-
-	if input.gpu != nil {
-		return gpuUnary("add_scalar", input, value)
-	}
-
-	out := input.Contiguous()
-	for i := range out.data {
-		out.data[i] += value
-	}
-
-	return out, nil
+	return scalar(backend.AddScalar, input, value)
 }

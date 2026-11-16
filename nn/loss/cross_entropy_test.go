@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -29,7 +31,7 @@ func TestCrossEntropy_ForwardThroughInterfacePreservesStableLoss(t *testing.T) {
 	}
 
 	want := math.Log1p(math.Exp(-1))
-	if output.Data().Rank() != 0 || math.Abs(float64(output.Data().Data()[0])-want) > 1e-6 {
+	if output.Data().Rank() != 0 || math.Abs(float64(backendtest.HostData(t, output.Data())[0])-want) > 1e-6 {
 		t.Fatalf("got %v, want scalar %g", output.Data(), want)
 	}
 
@@ -40,7 +42,7 @@ func TestCrossEntropy_ForwardThroughInterfacePreservesStableLoss(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i, gradient := range prediction.Grad().Data() {
+	for i, gradient := range backendtest.HostData(t, prediction.Grad()) {
 		expected := 2 / (1 + math.Exp(1))
 		if i == 0 {
 			expected = -expected
@@ -86,7 +88,7 @@ func TestCrossEntropy_ExtremeLogitsRemainStable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if want := math.Log1p(math.Exp(-1)); math.Abs(float64(output.Data().Data()[0])-want) > 1e-6 {
+	if want := math.Log1p(math.Exp(-1)); math.Abs(float64(backendtest.HostData(t, output.Data())[0])-want) > 1e-6 {
 		t.Fatalf("got %v, want %g", output.Data(), want)
 	}
 
@@ -94,7 +96,7 @@ func TestCrossEntropy_ExtremeLogitsRemainStable(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, gradient := range input.Grad().Data() {
+	for _, gradient := range backendtest.HostData(t, input.Grad()) {
 		if math.IsNaN(float64(gradient)) || math.IsInf(float64(gradient), 0) {
 			t.Fatal("nonfinite gradient")
 		}

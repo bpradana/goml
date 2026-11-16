@@ -4,6 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -34,7 +36,7 @@ func TestContiguous_TransposeReshapeAndGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(x.Grad().Data(), []float32{1, 3, 5, 2, 4, 6}) {
+	if !slices.Equal(backendtest.HostData(t, x.Grad()), []float32{1, 3, 5, 2, 4, 6}) {
 		t.Fatal(x.Grad())
 	}
 

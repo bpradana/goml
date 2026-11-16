@@ -4,6 +4,8 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -17,7 +19,7 @@ func TestPositionalEncoding_ReferenceSineCosineIncludingOddWidth(t *testing.T) {
 	}
 
 	want := []float64{0, 1, 0, math.Sin(1), math.Cos(1), math.Sin(1 / math.Pow(10000, 2.0/3))}
-	for i, got := range output.Data().Data() {
+	for i, got := range backendtest.HostData(t, output.Data()) {
 		if math.Abs(float64(got)-want[i]) > 1e-6 {
 			t.Fatalf("element %d: got %g, want %g", i, got, want[i])
 		}
@@ -32,7 +34,7 @@ func TestPositionalEncoding_ReferenceSineCosineIncludingOddWidth(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, gradient := range input.Grad().Data() {
+	for _, gradient := range backendtest.HostData(t, input.Grad()) {
 		if gradient != 1 {
 			t.Fatal("encoding changed input derivative")
 		}

@@ -1,6 +1,10 @@
 package tensor
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/bpradana/goml/tensor/backend"
+)
 
 // MaskUpperTriangle copies a matrix and replaces positions above its main
 // diagonal with fill. GPU execution remains on-device. Rank must be two.
@@ -13,16 +17,5 @@ func MaskUpperTriangle(input *Tensor, fill float32) (*Tensor, error) {
 		return nil, fmt.Errorf("tensor: triangle: expected rank two, got %v", input.shape)
 	}
 
-	if input.gpu != nil {
-		return gpuUnary("causal", input, fill)
-	}
-
-	output := input.Contiguous()
-	for row := range input.shape[0] {
-		for column := row + 1; column < input.shape[1]; column++ {
-			output.data[row*input.shape[1]+column] = fill
-		}
-	}
-
-	return output, nil
+	return scalar(backend.MaskUpperTriangle, input, fill)
 }

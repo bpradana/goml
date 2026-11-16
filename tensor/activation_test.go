@@ -16,7 +16,7 @@ func TestActivationBackward_CPUFiniteDifferencesAndExactShapes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for index, value := range input.Data() {
+			for index, value := range hostData(t, input) {
 				plus, err := Activation(kind, Scalar(value+0.001))
 				if err != nil {
 					t.Fatal(err)
@@ -27,9 +27,9 @@ func TestActivationBackward_CPUFiniteDifferencesAndExactShapes(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				want := (plus.Data()[0] - minus.Data()[0]) / 0.002
-				if math.Abs(float64(actual.Data()[index]-want)) > 0.0002 {
-					t.Fatalf("element %d derivative: got %g, want %g", index, actual.Data()[index], want)
+				want := (hostData(t, plus)[0] - hostData(t, minus)[0]) / 0.002
+				if math.Abs(float64(hostData(t, actual)[index]-want)) > 0.0002 {
+					t.Fatalf("element %d derivative: got %g, want %g", index, hostData(t, actual)[index], want)
 				}
 			}
 		})
@@ -44,7 +44,7 @@ func TestActivationBackward_CPUFiniteDifferencesAndExactShapes(t *testing.T) {
 	}
 
 	result, err := ActivationBackward("relu", Scalar(float32(math.NaN())), Scalar(1))
-	if err != nil || !math.IsNaN(float64(result.Data()[0])) {
+	if err != nil || !math.IsNaN(float64(hostData(t, result)[0])) {
 		t.Fatal("ReLU NaN derivative did not propagate", err)
 	}
 }

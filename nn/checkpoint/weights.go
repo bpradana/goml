@@ -8,6 +8,7 @@ import (
 
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // SaveWeights writes an ordered, unique parameter list to path. It preserves all
@@ -71,15 +72,10 @@ func LoadWeights(path string, parameters []*nn.Parameter) error {
 		}
 	}()
 
-	devices := make(map[string]tensor.Device)
+	devices := make(map[string]backend.Device)
 
 	for i, value := range values {
 		device := parameters[i].Value().Data().Device()
-
-		if device == nil {
-			prepared[i] = value
-			continue
-		}
 
 		prepared[i], err = value.To(device)
 		if err != nil {

@@ -19,28 +19,8 @@ func Slice(input *Value, axis, start, end int) (*Value, error) {
 	}
 
 	shape := input.data.Shape()
-	size := input.data.Numel()
 
 	return NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		if !g.IsCPU() {
-			return tensor.ScatterSlice(g, shape, axis, start)
-		}
-
-		gradient := make([]float32, size)
-
-		if g.Numel() != 0 {
-			inner := 1
-			for _, dim := range shape[axis+1:] {
-				inner *= dim
-			}
-
-			width := (end - start) * inner
-			for i, value := range g.Data() {
-				index := (i/width)*shape[axis]*inner + start*inner + i%width
-				gradient[index] = value
-			}
-		}
-
-		return tensor.From(gradient, shape...)
+		return tensor.ScatterSlice(g, shape, axis, start)
 	})
 }

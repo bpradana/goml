@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/tensor"
 )
 
@@ -21,7 +23,7 @@ func TestNewOperation_UsesOutputSeedAndConsumesGraph(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if got := input.Grad().Data()[0]; got != 12 {
+	if got := backendtest.HostData(t, input.Grad())[0]; got != 12 {
 		t.Fatalf("got gradient %g, want 12", got)
 	}
 

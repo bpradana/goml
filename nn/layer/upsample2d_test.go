@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -26,7 +28,7 @@ func TestUpsample2D_BilinearAndBicubicMatchHalfPixelReferences(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			for i, got := range output.Data().Data() {
+			for i, got := range backendtest.HostData(t, output.Data()) {
 				if math.Abs(float64(got-test.want[i])) > 1e-6 {
 					t.Fatalf("pixel %d: got %g want %g", i, got, test.want[i])
 				}
@@ -50,7 +52,7 @@ func TestUpsample2D_RepeatsPixelsAndAccumulatesGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Shape(), []int{1, 2, 2, 4}) || !slices.Equal(output.Data().Data(), []float32{1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4}) {
+	if !slices.Equal(output.Data().Shape(), []int{1, 2, 2, 4}) || !slices.Equal(backendtest.HostData(t, output.Data()), []float32{1, 1, 2, 2, 1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 4, 4}) {
 		t.Fatal(output.Data())
 	}
 
@@ -59,7 +61,7 @@ func TestUpsample2D_RepeatsPixelsAndAccumulatesGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(input.Grad().Data(), []float32{4, 4, 4, 4}) {
+	if !slices.Equal(backendtest.HostData(t, input.Grad()), []float32{4, 4, 4, 4}) {
 		t.Fatal(input.Grad())
 	}
 
@@ -78,7 +80,7 @@ func TestUpsample2D_InferenceIdentityAndEmptyDimensions(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if output.RequiresGrad() || !output.IsInference() || !slices.Equal(output.Data().Shape(), shape) || !slices.Equal(output.Data().Data(), data.Data()) || len(stage.Parameters()) != 0 {
+		if output.RequiresGrad() || !output.IsInference() || !slices.Equal(output.Data().Shape(), shape) || !slices.Equal(backendtest.HostData(t, output.Data()), backendtest.HostData(t, data)) || len(stage.Parameters()) != 0 {
 			t.Fatal(output.Data())
 		}
 	}
@@ -116,7 +118,7 @@ func TestUpsample2D_NearestPreservesSpecialValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for index, got := range output.Data().Data() {
+	for index, got := range backendtest.HostData(t, output.Data()) {
 		want := values[(index%8)/2]
 		if math.Float32bits(got) != math.Float32bits(want) {
 			t.Fatal(index, got, want)

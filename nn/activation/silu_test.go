@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -21,7 +23,7 @@ func TestSiLU_ForwardPreservesShapeAndSpecialValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	x := output.Data().Data()
+	x := backendtest.HostData(t, output.Data())
 	if !slices.Equal(output.Data().Shape(), []int{2, 3}) || x[0] != 0 || x[1] != 1000 || x[2] != 0 || !math.Signbit(float64(x[2])) || !math.IsInf(float64(x[3]), 1) || !math.IsNaN(float64(x[4])) || x[5] != 0 {
 		t.Fatal(output.Data())
 	}

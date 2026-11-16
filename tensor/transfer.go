@@ -5,13 +5,28 @@ import (
 	"runtime"
 	"slices"
 
+	"github.com/bpradana/goml/tensor/backend"
 	internalshape "github.com/bpradana/goml/tensor/internal/shape"
 )
 
-func allocateDevice(device Device, scope *Scope, shape []int) (*Tensor, error) {
+func allocateDevice(device backend.Device, scope *Scope, shape []int) (*Tensor, error) {
+	if device == nil {
+		return nil, fmt.Errorf("tensor: allocate: device required")
+	}
+
 	n, strides, err := internalshape.Layout(shape)
 	if err != nil {
 		return nil, err
+	}
+
+	return allocateLayout(device, scope, shape, n, strides)
+}
+
+// allocateLayout consumes already-validated layout metadata so constructors do
+// not allocate discarded strides and validate the same shape a second time.
+func allocateLayout(device backend.Device, scope *Scope, shape []int, n int, strides []int) (*Tensor, error) {
+	if device == nil {
+		return nil, fmt.Errorf("tensor: allocate: device required")
 	}
 
 	buffer, err := device.Allocate(n)
@@ -19,15 +34,53 @@ func allocateDevice(device Device, scope *Scope, shape []int) (*Tensor, error) {
 		return nil, fmt.Errorf("tensor: allocate on %s: %w", device.Name(), err)
 	}
 
-	storage := &deviceStorage{device: device, buffer: buffer}
-
-	return attachStorage(&Tensor{shape: slices.Clone(shape), strides: strides, size: n}, storage, scope), nil
+	return attachStorage(&Tensor{device: device, shape: slices.Clone(shape), strides: strides, size: n}, newStorage(buffer), scope)
 }
 
-// To explicitly transfers logical values to device. A nil device means CPU.
-// A same-device GPU transfer creates an independent storage-sharing lease;
-// CPU-to-CPU transfers copy. Cross-GPU transfers use explicit host staging.
-func (t *Tensor) To(device Device) (*Tensor, error) {
+// FromOn copies host data to a contiguous tensor on device. Shape and element
+// count must match. Allocation, upload, and device failures return errors.
+func FromOn(device backend.Device, data []float32, shape ...int) (*Tensor, error) {
+	n, strides, err := internalshape.Layout(shape)
+	if err != nil {
+		return nil, err
+	}
+
+	if n != len(data) {
+		return nil, fmt.Errorf("tensor: from: shape %v needs %d elements, got %d", shape, n, len(data))
+	}
+
+	output, err := allocateLayout(device, nil, shape, n, strides)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := device.Upload(output.deviceView().Buffer, data); err != nil {
+		_ = output.Close()
+		return nil, err
+	}
+
+	return output, nil
+}
+
+// ZerosOn allocates and explicitly initializes a contiguous zero tensor.
+func ZerosOn(device backend.Device, shape ...int) (*Tensor, error) {
+	return fullOn(device, nil, 0, shape)
+}
+
+// OnesOn allocates a contiguous one-filled tensor on device.
+func OnesOn(device backend.Device, shape ...int) (*Tensor, error) {
+	return fullOn(device, nil, 1, shape)
+}
+
+// ScalarOn allocates a rank-zero tensor on device.
+func ScalarOn(device backend.Device, value float32) (*Tensor, error) {
+	return FromOn(device, []float32{value})
+}
+
+// To copies logical values to independent storage on device. Same-device copies
+// execute through CopyBackend; use Retain to share immutable storage. Transfers
+// between execution contexts explicitly stage through host memory.
+func (t *Tensor) To(device backend.Device) (*Tensor, error) {
 	defer runtime.KeepAlive(t)
 
 	if err := valid("transfer", t); err != nil {
@@ -35,11 +88,18 @@ func (t *Tensor) To(device Device) (*Tensor, error) {
 	}
 
 	if device == nil {
-		return t.ToCPU()
+		return nil, fmt.Errorf("tensor: transfer: device required; use CPU()")
 	}
 
-	if t.gpu != nil && device.ID() == t.Device().ID() {
-		return attachStorage(&Tensor{shape: t.Shape(), strides: t.Strides(), offset: t.offset, size: t.size}, t.gpu.storage, nil), nil
+	if t.device.ID() == device.ID() {
+		result, err := t.MakeContiguous()
+		if err != nil {
+			return nil, err
+		}
+
+		result.Keep()
+
+		return result, nil
 	}
 
 	values, err := t.HostData()
@@ -47,33 +107,14 @@ func (t *Tensor) To(device Device) (*Tensor, error) {
 		return nil, err
 	}
 
-	result, err := allocateDevice(device, nil, t.shape)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := device.Upload(result.gpu.storage.buffer, values); err != nil {
-		_ = result.Close()
-		return nil, fmt.Errorf("tensor: upload: %w", err)
-	}
-
-	return result, nil
+	return FromOn(device, values, t.shape...)
 }
 
-// ToCPU explicitly downloads GPU values, returning independent contiguous CPU
-// storage. CPU inputs are copied. Transfer and synchronization failures return errors.
-func (t *Tensor) ToCPU() (*Tensor, error) {
-	values, err := t.HostData()
-	if err != nil {
-		return nil, err
-	}
+// ToCPU copies logical values into independent contiguous CPU storage.
+func (t *Tensor) ToCPU() (*Tensor, error) { return t.To(CPU()) }
 
-	return From(values, t.shape...)
-}
-
-// HostData explicitly synchronizes and downloads GPU data in logical order.
-// CPU inputs return the same independent copy as Data. No unowned native slice
-// is exposed. Closed tensors and native failures return errors.
+// HostData explicitly reads logical values into caller-owned Go memory. It may
+// synchronize and download accelerator work. No native memory slice is exposed.
 func (t *Tensor) HostData() ([]float32, error) {
 	defer runtime.KeepAlive(t)
 
@@ -81,32 +122,52 @@ func (t *Tensor) HostData() ([]float32, error) {
 		return nil, err
 	}
 
-	if t.gpu == nil {
-		return t.Data(), nil
+	values := make([]float32, t.size)
+	if host, ok := t.device.(backend.HostAccess); ok {
+		if err := host.Read(t.deviceView(), values); err != nil {
+			return nil, err
+		}
+
+		return values, nil
 	}
 
 	source := t
-	if !t.IsContiguous() || t.offset != 0 || t.size != t.gpu.storage.buffer.Len() {
+
+	view := t.deviceView()
+	if !t.IsContiguous() || t.offset != 0 || t.size != view.Buffer.Len() {
+		// A host read is an explicit transfer. A minimal backend without Copy
+		// can still download physical storage and gather logical view values.
+		if _, ok := t.device.(backend.CopyBackend); !ok {
+			physical := make([]float32, view.Buffer.Len())
+			if err := t.device.Download(view.Buffer, physical); err != nil {
+				return nil, err
+			}
+
+			for i := range values {
+				values[i] = physical[t.index(i)]
+			}
+
+			return values, nil
+		}
+
 		var err error
 
 		source, err = t.MakeContiguous()
 		if err != nil {
 			return nil, err
 		}
-
 		defer func() { _ = source.Close() }()
 	}
 
-	values := make([]float32, t.size)
-	if err := source.Device().Download(source.gpu.storage.buffer, values); err != nil {
+	if err := source.device.Download(source.deviceView().Buffer, values); err != nil {
 		return nil, err
 	}
 
 	return values, nil
 }
 
-// MakeContiguous allocates independent row-major storage on the current device.
-// GPU execution is fallible and does not perform a host transfer.
+// MakeContiguous copies logical values into independent contiguous storage on
+// this device. Missing copy capability returns ErrUnsupported; no CPU fallback.
 func (t *Tensor) MakeContiguous() (*Tensor, error) {
 	defer runtime.KeepAlive(t)
 
@@ -114,87 +175,88 @@ func (t *Tensor) MakeContiguous() (*Tensor, error) {
 		return nil, err
 	}
 
-	if t.gpu == nil {
-		return t.Contiguous(), nil
-	}
-
-	backend, ok := t.Device().(LayoutBackend)
+	compute, ok := t.device.(backend.CopyBackend)
 	if !ok {
-		return nil, fmt.Errorf("tensor: device lacks materialization")
+		return nil, unsupported("copy", t.device)
 	}
 
-	out, err := allocatedOn(t.shape, t)
+	output, err := allocatedOn(t.shape, t)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := backend.Copy(out.deviceView(), t.deviceView()); err != nil {
-		_ = out.Close()
-		return nil, err
-	}
-
-	return out, nil
-}
-
-// FullLike allocates a tensor on reference's device with the requested shape,
-// filled with value. It is useful for device-correct seeds and optimizer state.
-func FullLike(reference *Tensor, value float32, shape ...int) (*Tensor, error) {
-	if err := valid("full", reference); err != nil {
-		return nil, err
-	}
-
-	out, err := allocatedOn(shape, reference)
-	if err != nil {
-		return nil, err
-	}
-
-	if out.gpu == nil {
-		for i := range out.data {
-			out.data[i] = value
-		}
-
-		return out, nil
-	}
-
-	backend, ok := out.Device().(ArithmeticBackend)
-	if !ok {
-		_ = out.Close()
-		return nil, fmt.Errorf("tensor: device lacks fill")
-	}
-
-	if err := backend.Fill(out.gpu.storage.buffer, value); err != nil {
-		_ = out.Close()
-		return nil, err
-	}
-
-	return out, nil
-}
-
-// FromLike copies host values into a tensor on reference's device and temporary
-// scope. It explicitly uploads GPU constants and validates the exact shape.
-func FromLike(reference *Tensor, values []float32, shape ...int) (*Tensor, error) {
-	if err := valid("from like", reference); err != nil {
-		return nil, err
-	}
-
-	if reference.gpu == nil {
-		return From(values, shape...)
-	}
-
-	output, err := allocatedOn(shape, reference)
-	if err != nil {
-		return nil, err
-	}
-
-	if output.size != len(values) {
-		_ = output.Close()
-		return nil, fmt.Errorf("tensor: from like: data length does not match shape %v", shape)
-	}
-
-	if err := output.Device().Upload(output.gpu.storage.buffer, values); err != nil {
+	if err := compute.Copy(output.deviceView(), t.deviceView()); err != nil {
 		_ = output.Close()
 		return nil, err
 	}
 
 	return output, nil
+}
+
+func fullOn(device backend.Device, scope *Scope, value float32, shape []int) (*Tensor, error) {
+	if device == nil {
+		return nil, fmt.Errorf("tensor: full: device required")
+	}
+
+	compute, ok := device.(backend.FillBackend)
+	if !ok {
+		return nil, unsupported("fill", device)
+	}
+
+	output, err := allocateDevice(device, scope, shape)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := compute.Fill(output.deviceView(), value); err != nil {
+		_ = output.Close()
+		return nil, err
+	}
+
+	return output, nil
+}
+
+// FullLike allocates and fills storage on reference's device and temporary scope.
+func FullLike(reference *Tensor, value float32, shape ...int) (*Tensor, error) {
+	defer runtime.KeepAlive(reference)
+
+	if err := valid("full", reference); err != nil {
+		return nil, err
+	}
+
+	return fullOn(reference.device, reference.scope.Load(), value, shape)
+}
+
+// FromLike explicitly copies host values to reference's device and scope.
+func FromLike(reference *Tensor, values []float32, shape ...int) (*Tensor, error) {
+	defer runtime.KeepAlive(reference)
+
+	if err := valid("from like", reference); err != nil {
+		return nil, err
+	}
+
+	n, strides, err := internalshape.Layout(shape)
+	if err != nil {
+		return nil, err
+	}
+
+	if n != len(values) {
+		return nil, fmt.Errorf("tensor: from like: data length does not match shape %v", shape)
+	}
+
+	output, err := allocateLayout(reference.device, reference.scope.Load(), shape, n, strides)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := output.device.Upload(output.deviceView().Buffer, values); err != nil {
+		_ = output.Close()
+		return nil, err
+	}
+
+	return output, nil
+}
+
+func unsupported(operation string, device backend.Device) error {
+	return fmt.Errorf("tensor: %s on %s: %w", operation, device.Name(), backend.ErrUnsupported)
 }

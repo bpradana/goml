@@ -36,9 +36,18 @@ func predict(model *layer.Sequential, data *tensor.Tensor, targets []int, batch 
 			return 0, 0, err
 		}
 
-		total += objective.Data().Data()[0] * float32(end-start)
+		lossValue1, err := objective.Data().At()
+		if err != nil {
+			return 0, 0, err
+		}
+
+		total += lossValue1 * float32(end-start)
 		classes := logits.Shape()[1]
-		scores := logits.Data()
+
+		scores, err := logits.HostData()
+		if err != nil {
+			return 0, 0, err
+		}
 
 		for row := range end - start {
 			best := 0

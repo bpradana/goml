@@ -72,3 +72,46 @@ func TestView_ClosedBuffersAndCountOverflow(t *testing.T) {
 		t.Fatal("count overflow accepted", err)
 	}
 }
+
+func FuzzViewLayout(f *testing.F) {
+	f.Add(2, 3, 3, 1, 0, 6)
+	f.Add(0, 3, 3, 1, 99, 0)
+	f.Add(2, 2, 0, 1, 0, 2)
+	f.Add(int(^uint(0)>>1), 2, 2, 1, 0, 4)
+	f.Fuzz(func(t *testing.T, rows, columns, rowStride, columnStride, offset, length int) {
+		value := View{Buffer: &viewBuffer{length: length}, Shape: []int{rows, columns}, Strides: []int{rowStride, columnStride}, Offset: offset}
+		readError := value.Validate()
+
+		writeError := value.ValidateOutput()
+		if writeError == nil && readError != nil {
+			t.Fatal("writable view failed read validation")
+		}
+
+		if readError != nil {
+			return
+		}
+
+		if rows < 0 || columns < 0 || rowStride < 0 || columnStride < 0 || offset < 0 || length < 0 {
+			t.Fatal("invalid metadata accepted")
+		}
+
+		if rows == 0 || columns == 0 {
+			return
+		}
+		// Bounds arithmetic is checked through division, without repeating a
+		// potentially overflowing address multiplication from untrusted metadata.
+		if offset >= length {
+			t.Fatal("starting offset exceeds physical storage")
+		}
+
+		remaining := length - 1 - offset
+		if rows > 1 && rowStride > remaining/(rows-1) {
+			t.Fatal("row extent exceeds storage")
+		}
+
+		remaining -= (rows - 1) * rowStride
+		if columns > 1 && columnStride > remaining/(columns-1) {
+			t.Fatal("column extent exceeds storage")
+		}
+	})
+}

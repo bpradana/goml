@@ -7,6 +7,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/nn/layer"
@@ -132,7 +134,7 @@ func TestMarshalUnmarshal_AllBuiltInModelsPreservePredictionsAndTraining(t *test
 			clear(encoded)
 
 			got, err := restored.Predict(input)
-			if err != nil || !slices.Equal(got.Shape(), want.Shape()) || !slices.Equal(got.Data(), want.Data()) {
+			if err != nil || !slices.Equal(got.Shape(), want.Shape()) || !slices.Equal(backendtest.HostData(t, got), backendtest.HostData(t, want)) {
 				t.Fatalf("restored prediction differs: %v %v", got, err)
 			}
 

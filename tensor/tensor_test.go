@@ -1,10 +1,13 @@
 package tensor
 
 import (
+	"errors"
 	"math/rand/v2"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 func fromTest(t *testing.T, data []float32, shape ...int) *Tensor {
@@ -21,7 +24,7 @@ func fromTest(t *testing.T, data []float32, shape ...int) *Tensor {
 func assertData(t *testing.T, x *Tensor, shape []int, want []float32) {
 	t.Helper()
 
-	if !slices.Equal(x.Shape(), shape) || !slices.Equal(x.Data(), want) {
+	if !slices.Equal(x.Shape(), shape) || !slices.Equal(hostData(t, x), want) {
 		t.Fatalf("got %v, want shape=%v data=%v", x, shape, want)
 	}
 }
@@ -82,7 +85,7 @@ func TestConstructorsAndInvalidInputs(t *testing.T) {
 		}
 
 		y, err := fn(rand.New(rand.NewPCG(1, 2)), 2, 3)
-		if err != nil || !slices.Equal(x.Data(), y.Data()) {
+		if err != nil || !slices.Equal(hostData(t, x), hostData(t, y)) {
 			t.Fatal("random initialization must be reproducible")
 		}
 	}
@@ -102,7 +105,7 @@ func TestConstructorsAndInvalidInputs(t *testing.T) {
 	assertData(t, ones, []int{2}, []float32{1, 1})
 }
 
-func TestTensor_StringBoundsHighRankPreview(t *testing.T) {
+func TestTensor_StringBoundsHighRankMetadata(t *testing.T) {
 	shape := make([]int, 1000)
 	for i := range shape {
 		shape[i] = 1
@@ -115,5 +118,20 @@ func TestTensor_StringBoundsHighRankPreview(t *testing.T) {
 
 	if text := a.String(); len(text) > 150 || !strings.Contains(text, "...") {
 		t.Fatalf("unbounded high-rank preview: %d bytes", len(text))
+	}
+}
+
+func TestConstructors_RejectFloat32ByteCountOverflow(t *testing.T) {
+	rng := rand.New(rand.NewPCG(1, 2))
+	maximum := int(^uint(0) >> 1)
+
+	for _, constructor := range []func() (*Tensor, error){
+		func() (*Tensor, error) { return Zeros(maximum) },
+		func() (*Tensor, error) { return Rand(rng, maximum) },
+		func() (*Tensor, error) { return Randn(rng, maximum) },
+	} {
+		if _, err := constructor(); !errors.Is(err, backend.ErrAllocation) {
+			t.Fatalf("got %v, want allocation failure", err)
+		}
 	}
 }

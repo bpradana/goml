@@ -95,8 +95,8 @@ func (a *Adam) deviceStep() error {
 
 				_ = update.second.Close()
 				if update.initial {
-					_ = update.state.gpuFirst.Close()
-					_ = update.state.gpuSecond.Close()
+					_ = update.state.deviceFirst.Close()
+					_ = update.state.deviceSecond.Close()
 				}
 			}
 		}
@@ -128,10 +128,10 @@ func (a *Adam) deviceStep() error {
 				return err
 			}
 
-			state = &adamState{gpuFirst: first, gpuSecond: second}
+			state = &adamState{deviceFirst: first, deviceSecond: second}
 		}
 
-		if state.gpuFirst == nil || state.gpuSecond == nil {
+		if state.deviceFirst == nil || state.deviceSecond == nil {
 			return fmt.Errorf("nn: adam: recreate the optimizer after changing parameter devices")
 		}
 
@@ -140,23 +140,23 @@ func (a *Adam) deviceStep() error {
 			return err
 		}
 
-		firstView, err := scope.To(state.gpuFirst)
+		firstView, err := scope.To(state.deviceFirst)
 		if err != nil {
 			return err
 		}
 
-		secondView, err := scope.To(state.gpuSecond)
+		secondView, err := scope.To(state.deviceSecond)
 		if err != nil {
 			return err
 		}
 
-		scopedState := &adamState{gpuFirst: firstView, gpuSecond: secondView, steps: state.steps}
+		scopedState := &adamState{deviceFirst: firstView, deviceSecond: secondView, steps: state.steps}
 
 		next, first, second, err := a.computeDeviceUpdate(values, gradient, scopedState)
 		if err != nil {
 			if initial {
-				_ = state.gpuFirst.Close()
-				_ = state.gpuSecond.Close()
+				_ = state.deviceFirst.Close()
+				_ = state.deviceSecond.Close()
 			}
 
 			return err
@@ -180,8 +180,8 @@ func (a *Adam) deviceStep() error {
 		update.first.Keep()
 		update.second.Keep()
 
-		oldFirst, oldSecond := update.state.gpuFirst, update.state.gpuSecond
-		update.state.gpuFirst, update.state.gpuSecond = update.first, update.second
+		oldFirst, oldSecond := update.state.deviceFirst, update.state.deviceSecond
+		update.state.deviceFirst, update.state.deviceSecond = update.first, update.second
 		update.state.steps++
 		a.state[update.parameter] = update.state
 
@@ -195,7 +195,7 @@ func (a *Adam) deviceStep() error {
 }
 
 func (a *Adam) computeDeviceUpdate(values, gradient *tensor.Tensor, state *adamState) (*tensor.Tensor, *tensor.Tensor, *tensor.Tensor, error) {
-	firstDecay, err := tensor.Scale(state.gpuFirst, a.beta1)
+	firstDecay, err := tensor.Scale(state.deviceFirst, a.beta1)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -220,7 +220,7 @@ func (a *Adam) computeDeviceUpdate(values, gradient *tensor.Tensor, state *adamS
 		return nil, nil, nil, err
 	}
 
-	secondDecay, err := tensor.Scale(state.gpuSecond, a.beta2)
+	secondDecay, err := tensor.Scale(state.deviceSecond, a.beta2)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -268,9 +268,9 @@ func (a *Adam) computeDeviceUpdate(values, gradient *tensor.Tensor, state *adamS
 // not close model parameters. CPU moment storage is released to Go's collector.
 func (a *Adam) Close() error {
 	for _, state := range a.state {
-		if state.gpuFirst != nil {
-			_ = state.gpuFirst.Close()
-			_ = state.gpuSecond.Close()
+		if state.deviceFirst != nil {
+			_ = state.deviceFirst.Close()
+			_ = state.deviceSecond.Close()
 		}
 	}
 

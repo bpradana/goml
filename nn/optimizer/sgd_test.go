@@ -4,13 +4,20 @@ import (
 	"math"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
 func TestSGD_StepMatchesReferenceAndPreservesIdentity(t *testing.T) {
 	parameter := testParameter(t, []float32{1, -2})
 	leaf := parameter.Value()
-	oldData := leaf.Data()
+
+	oldData, err := leaf.Data().Retain()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = oldData.Close() }()
 
 	accumulateGradient(t, parameter, []float32{2, -4})
 
@@ -24,12 +31,12 @@ func TestSGD_StepMatchesReferenceAndPreservesIdentity(t *testing.T) {
 	}
 
 	for i, want := range []float32{0.8, -1.6} {
-		if math.Abs(float64(leaf.Data().Data()[i]-want)) > 1e-6 {
+		if math.Abs(float64(backendtest.HostData(t, leaf.Data())[i]-want)) > 1e-6 {
 			t.Fatalf("element %d: got %v, want %v", i, leaf.Data(), want)
 		}
 	}
 
-	if parameter.Value() != leaf || oldData.Data()[0] != 1 {
+	if parameter.Value() != leaf || backendtest.HostData(t, oldData)[0] != 1 {
 		t.Fatal("step changed identity or mutated previous tensor")
 	}
 
@@ -56,7 +63,7 @@ func TestSGD_StepSkipsMissingGradients(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if parameter.Value().Data().Data()[0] != 1 {
+	if backendtest.HostData(t, parameter.Value().Data())[0] != 1 {
 		t.Fatal("parameter changed without a gradient")
 	}
 }

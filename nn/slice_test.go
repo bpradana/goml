@@ -3,6 +3,8 @@ package nn
 import (
 	"slices"
 	"testing"
+
+	"github.com/bpradana/goml/tensor/backendtest"
 )
 
 func TestSlice_NoncontiguousViewScattersGradient(t *testing.T) {
@@ -13,7 +15,7 @@ func TestSlice_NoncontiguousViewScattersGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(y.Data().Data(), []float32{2, 3, 5, 6}) {
+	if !slices.Equal(backendtest.HostData(t, y.Data()), []float32{2, 3, 5, 6}) {
 		t.Fatal(y.Data())
 	}
 
@@ -26,7 +28,7 @@ func TestSlice_NoncontiguousViewScattersGradient(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(x.Grad().Data(), []float32{0, 1, 1, 0, 1, 1}) {
+	if !slices.Equal(backendtest.HostData(t, x.Grad()), []float32{0, 1, 1, 0, 1, 1}) {
 		t.Fatal(x.Grad())
 	}
 }
@@ -48,7 +50,7 @@ func TestSlice_EmptyRangeAndInvalidBounds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(x.Grad().Data(), []float32{0, 0}) {
+	if !slices.Equal(backendtest.HostData(t, x.Grad()), []float32{0, 0}) {
 		t.Fatal(x.Grad())
 	}
 

@@ -24,12 +24,16 @@ func (*SiLU) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: silu: nil or uninitialized value")
 	}
 
-	if !input.Data().IsCPU() {
+	if !input.Data().HostAccessible() {
 		return deviceActivation(input, "silu")
 	}
 
 	shape := input.Data().Shape()
-	values := input.Data().Data()
+
+	values, err := input.Data().HostData()
+	if err != nil {
+		return nil, err
+	}
 
 	var sigmoid []float32
 	if input.RequiresGrad() {
@@ -55,7 +59,7 @@ func (*SiLU) Forward(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	data, err := tensor.From(values, shape...)
+	data, err := tensor.FromLike(input.Data(), values, shape...)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +69,10 @@ func (*SiLU) Forward(input *nn.Value) (*nn.Value, error) {
 	}
 
 	return nn.NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
-		gradient := g.Data()
+		gradient, err := g.HostData()
+		if err != nil {
+			return nil, err
+		}
 
 		for i, probability := range sigmoid {
 			derivative := probability + values[i]*(1-probability)
@@ -76,7 +83,7 @@ func (*SiLU) Forward(input *nn.Value) (*nn.Value, error) {
 			gradient[i] *= derivative
 		}
 
-		return tensor.From(gradient, shape...)
+		return tensor.FromLike(input.Data(), gradient, shape...)
 	})
 }
 

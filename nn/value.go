@@ -2,6 +2,7 @@ package nn
 
 import (
 	"fmt"
+	"runtime"
 
 	"github.com/bpradana/goml/tensor"
 )
@@ -9,14 +10,16 @@ import (
 // Value holds an immutable tensor and optional differentiation state.
 // Construct it with NewValue or Inference.
 type Value struct {
-	data      *tensor.Tensor
-	grad      *tensor.Tensor
-	ownsGrad  bool
-	requires  bool
-	inference bool
-	consumed  bool
-	parents   []*Value
-	backward  func(*tensor.Tensor) ([]*tensor.Tensor, error)
+	parameter       *parameterData
+	savedParameters *parameterReads
+	data            *tensor.Tensor
+	grad            *tensor.Tensor
+	ownsGrad        bool
+	requires        bool
+	inference       bool
+	consumed        bool
+	parents         []*Value
+	backward        func(*tensor.Tensor) ([]*tensor.Tensor, error)
 }
 
 // NewValue wraps immutable data without copying it. requiresGrad controls
@@ -43,9 +46,9 @@ func Inference(data *tensor.Tensor) (*Value, error) {
 	return v, nil
 }
 
-// Data returns the immutable tensor owned by this value. A GPU parameter's
-// handle is borrowed until its next update. Create a view or call To with the
-// same device to retain an independent lease across parameter updates.
+// Data returns this value's immutable tensor. A parameter handle is borrowed
+// until replacement. Use Tensor.Retain to keep an independent handle across
+// updates; autograd retains the forward generations needed for backward.
 func (v *Value) Data() *tensor.Tensor {
 	return v.data
 }
@@ -80,7 +83,7 @@ func (v *Value) ZeroGrad() {
 // Detach shares immutable data in a new constant leaf with no graph references.
 // Trainable values combined with this leaf can still construct a graph.
 func (v *Value) Detach() *Value {
-	return &Value{data: v.data}
+	return &Value{data: v.data, parameter: v.parameter}
 }
 
 func checkValues(op string, values ...*Value) error {
@@ -113,7 +116,30 @@ func record(data *tensor.Tensor, first *Value, rest ...*Value) *Value {
 		v.parents = make([]*Value, len(rest)+1)
 		v.parents[0] = first
 		copy(v.parents[1:], rest)
+
+		for _, parent := range v.parents {
+			if parent.parameter != nil {
+				if v.savedParameters == nil {
+					v.savedParameters = &parameterReads{}
+				}
+
+				parent.parameter.acquire()
+				v.savedParameters.values = append(v.savedParameters.values, parent.parameter)
+			}
+		}
+
+		if v.savedParameters != nil {
+			v.savedParameters.cleanup = runtime.AddCleanup(v, func(reads *parameterReads) { reads.release() }, v.savedParameters)
+		}
 	}
 
 	return v
+}
+
+func (v *Value) releaseParameters() {
+	if v.savedParameters != nil {
+		v.savedParameters.release()
+		v.savedParameters.cleanup.Stop()
+		v.savedParameters = nil
+	}
 }

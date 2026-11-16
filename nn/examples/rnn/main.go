@@ -79,7 +79,12 @@ func run() error {
 		}
 
 		if iteration == 0 {
-			initialLoss = objective.Data().Data()[0]
+			lossValue1, err := objective.Data().At()
+			if err != nil {
+				return err
+			}
+
+			initialLoss = lossValue1
 		}
 
 		if err := objective.Backward(); err != nil {
@@ -98,13 +103,23 @@ func run() error {
 		return err
 	}
 
-	for sample, prediction := range predictions.Data() {
-		if math.IsNaN(float64(prediction)) || math.Abs(float64(prediction-targetData.Data()[sample])) > 0.03 {
+	values, err := predictions.HostData()
+	if err != nil {
+		return err
+	}
+
+	targets, err := targetData.HostData()
+	if err != nil {
+		return err
+	}
+
+	for sample, prediction := range values {
+		if math.IsNaN(float64(prediction)) || math.Abs(float64(prediction-targets[sample])) > 0.03 {
 			return fmt.Errorf("rnn: sequence %d did not converge: got %g", sample, prediction)
 		}
 	}
 
-	fmt.Printf("rnn: initial loss %.6f, predictions %v\n", initialLoss, predictions.Data())
+	fmt.Printf("rnn: initial loss %.6f, predictions %v\n", initialLoss, values)
 
 	return nil
 }

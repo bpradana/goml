@@ -5,6 +5,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/tensor"
 )
@@ -25,7 +27,7 @@ func TestReLU_ZeroDerivativeAtZero(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if input.Grad().Data()[0] != 0 {
+	if backendtest.HostData(t, input.Grad())[0] != 0 {
 		t.Fatal("ReLU derivative at zero must be zero")
 	}
 }
@@ -52,11 +54,11 @@ func TestReLU_ForwardPreservesStridedInputAndShape(t *testing.T) {
 	}
 
 	if !slices.Equal(output.Data().Shape(), []int{3, 2}) ||
-		!slices.Equal(output.Data().Data(), []float32{0, 0, 0, 1, 0, 2}) {
+		!slices.Equal(backendtest.HostData(t, output.Data()), []float32{0, 0, 0, 1, 0, 2}) {
 		t.Fatal(output.Data())
 	}
 
-	if !slices.Equal(data.Data(), []float32{-3, -2, -1, 0, 1, 2}) {
+	if !slices.Equal(backendtest.HostData(t, data), []float32{-3, -2, -1, 0, 1, 2}) {
 		t.Fatal("activation changed its input storage")
 	}
 }
@@ -69,7 +71,7 @@ func TestReLU_ForwardPropagatesSpecialValues(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	values := output.Data().Data()
+	values := backendtest.HostData(t, output.Data())
 	if !math.IsNaN(float64(values[0])) || !math.IsInf(float64(values[1]), 1) ||
 		values[2] != 0 || values[3] != 0 || math.Signbit(float64(values[3])) {
 		t.Fatal(values)

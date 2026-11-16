@@ -92,8 +92,18 @@ func run() error {
 		return err
 	}
 
-	for i, got := range prediction.Data() {
-		if math.Abs(float64(got-y.Data()[i])) > 0.1 {
+	values, err := prediction.HostData()
+	if err != nil {
+		return err
+	}
+
+	targets, err := y.HostData()
+	if err != nil {
+		return err
+	}
+
+	for i, got := range values {
+		if math.Abs(float64(got-targets[i])) > 0.1 {
 			return fmt.Errorf("xor: training did not converge at example %d: got %g", i, got)
 		}
 	}

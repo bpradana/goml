@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -30,7 +32,7 @@ func TestRNN_ReferenceRecurrenceAndInitialStateGradient(t *testing.T) {
 
 	second := math.Tanh(-0.4*0.5 + first*0.3 + 0.1)
 	for i, want := range []float64{first, second} {
-		if math.Abs(float64(output.Data().Data()[i])-want) > 1e-6 {
+		if math.Abs(float64(backendtest.HostData(t, output.Data())[i])-want) > 1e-6 {
 			t.Fatalf("step %d: %v, want %g", i, output.Data(), want)
 		}
 	}
@@ -45,7 +47,7 @@ func TestRNN_ReferenceRecurrenceAndInitialStateGradient(t *testing.T) {
 	}
 
 	want := (1 - second*second) * 0.3 * (1 - first*first) * 0.3
-	assertDerivative(t, "initial hidden", 0, initial.Grad().Data()[0], want)
+	assertDerivative(t, "initial hidden", 0, backendtest.HostData(t, initial.Grad())[0], want)
 }
 
 func TestRNN_BatchedSequenceAndAllParametersMatchFiniteDifferences(t *testing.T) {
@@ -93,12 +95,12 @@ func TestRNN_ExplicitStateMatchesUnbrokenSequenceAndForwardResetsState(t *testin
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(chunk.Data().Data(), full.Data().Data()[2:]) {
+	if !slices.Equal(backendtest.HostData(t, chunk.Data()), backendtest.HostData(t, full.Data())[2:]) {
 		t.Fatal("chunked state differs from uninterrupted sequence")
 	}
 
 	again, err := recurrent.Forward(input)
-	if err != nil || !slices.Equal(again.Data().Data(), full.Data().Data()) {
+	if err != nil || !slices.Equal(backendtest.HostData(t, again.Data()), backendtest.HostData(t, full.Data())) {
 		t.Fatalf("forward retained state: %v", err)
 	}
 }

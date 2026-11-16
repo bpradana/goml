@@ -228,7 +228,12 @@ func run(options runOptions) error {
 				return err
 			}
 
-			total += objective.Data().Data()[0] * float32(end-start)
+			lossValue1, err := objective.Data().At()
+			if err != nil {
+				return err
+			}
+
+			total += lossValue1 * float32(end-start)
 
 			if err := objective.Backward(); err != nil {
 				return err

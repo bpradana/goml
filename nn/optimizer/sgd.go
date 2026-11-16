@@ -33,7 +33,7 @@ func (s *SGD) Step() error {
 		return fmt.Errorf("nn: sgd: use NewSGD to initialize the optimizer")
 	}
 
-	if len(s.parameters) > 0 && s.parameters[0].Value().Data().Device() != nil {
+	if len(s.parameters) > 0 && !s.parameters[0].Value().Data().HostAccessible() {
 		return deviceSGD(s.parameters, s.learningRate)
 	}
 

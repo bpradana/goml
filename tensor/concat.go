@@ -2,7 +2,10 @@ package tensor
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
+
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 // Concat allocates tensors joined along axis. Inputs must have equal ranks and
@@ -45,36 +48,48 @@ func Concat(axis int, inputs ...*Tensor) (*Tensor, error) {
 		shape[axis] += input.shape[axis]
 	}
 
-	if inputs[0].gpu != nil {
-		return gpuConcat(axis, shape, inputs)
+	defer runtime.KeepAlive(inputs)
+
+	views := make([]backend.View, len(inputs))
+	for i, input := range inputs {
+		views[i] = input.deviceView()
 	}
 
-	out, err := allocated(shape)
-	if err != nil || out.size == 0 {
-		return out, err
+	compute, hasConcat := inputs[0].device.(backend.ConcatBackend)
+
+	copier, hasCopy := inputs[0].device.(backend.CopyBackend)
+	if !hasConcat && !hasCopy {
+		return nil, unsupported("concat", inputs[0].device)
 	}
 
-	inner := out.strides[axis]
-	outer := out.size / (shape[axis] * inner)
-	offset := 0
+	out, err := allocatedOn(shape, inputs...)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, input := range inputs {
-		width := input.shape[axis] * inner
-		contiguous := input.IsContiguous()
+	if hasConcat {
+		err = compute.Concat(out.deviceView(), axis, views)
+	} else {
+		offset := 0
 
-		for row := range outer {
-			target := out.data[row*shape[axis]*inner+offset:][:width]
-			if contiguous {
-				start := input.offset + row*width
-				copy(target, input.data[start:start+width])
-			} else {
-				for j := range target {
-					target[j] = input.data[input.index(row*width+j)]
-				}
+		for _, source := range views {
+			target := out.deviceView()
+			target.Shape = slices.Clone(target.Shape)
+			target.Shape[axis] = source.Shape[axis]
+			target.Offset = offset * out.strides[axis]
+
+			err = copier.Copy(target, source)
+			if err != nil {
+				break
 			}
-		}
 
-		offset += width
+			offset += source.Shape[axis]
+		}
+	}
+
+	if err != nil {
+		_ = out.Close()
+		return nil, err
 	}
 
 	return out, nil

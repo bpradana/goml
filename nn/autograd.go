@@ -131,10 +131,8 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 		adjoints[node] = g
 	}
 
-	if device := v.data.Device(); device != nil {
-		if err := device.Synchronize(); err != nil {
-			return err
-		}
+	if err := v.data.Device().Synchronize(); err != nil {
+		return err
 	}
 
 	// Leaves outlive individual forward scopes. Give them independent leases
@@ -151,8 +149,8 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 	}()
 
 	for _, node := range order {
-		if len(node.parents) == 0 && node.data.Device() != nil {
-			gradient, err := adjoints[node].To(node.data.Device())
+		if len(node.parents) == 0 {
+			gradient, err := adjoints[node].Retain()
 			if err != nil {
 				return err
 			}
@@ -170,6 +168,7 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 		}
 
 		if node.backward != nil {
+			node.releaseParameters()
 			node.parents = nil
 			node.backward = nil
 			node.consumed = true

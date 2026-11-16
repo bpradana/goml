@@ -41,6 +41,7 @@ func NewOperation(
 	}
 
 	if backward == nil {
+		out.releaseParameters()
 		return nil, fmt.Errorf("nn: operation: tracked operation requires a backward rule")
 	}
 

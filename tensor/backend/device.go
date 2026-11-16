@@ -1,15 +1,5 @@
 package backend
 
-// Buffer is one device-owned allocation, measured in Float32 elements. Valid
-// reports ErrClosed after release or owning-device shutdown. Close is idempotent.
-// Queued operations must retain physical memory after the caller closes a buffer.
-type Buffer interface {
-	Len() int
-	DeviceID() string
-	Valid() error
-	Close() error
-}
-
 // Device is one execution context with a stable, unique identity. It rejects
 // foreign buffers and reports allocation, transfer, and execution failures.
 // Upload and Download copy exactly one physical buffer. Download synchronizes

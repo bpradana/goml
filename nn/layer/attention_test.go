@@ -6,6 +6,8 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/bpradana/goml/tensor/backendtest"
+
 	"github.com/bpradana/goml/nn"
 )
 
@@ -27,7 +29,7 @@ func TestMultiHeadAttention_HeadWidthScalesLogitsBeforeSoftmax(t *testing.T) {
 
 	probability := math.Exp(1/math.Sqrt(2)) / (1 + math.Exp(1/math.Sqrt(2)))
 	for i, want := range []float64{probability, 1 - probability, 1 - probability, probability} {
-		if math.Abs(float64(output.Data().Data()[i])-want) > 1e-6 {
+		if math.Abs(float64(backendtest.HostData(t, output.Data())[i])-want) > 1e-6 {
 			t.Fatalf("element %d: got %v, want %g", i, output.Data(), want)
 		}
 	}
@@ -60,7 +62,7 @@ func TestMultiHeadAttention_IdentityProjectionsMatchIndependentHeads(t *testing.
 				weightA, weightB := math.Exp(query*a), math.Exp(query*b)
 				want := (weightA*a + weightB*b) / (weightA + weightB)
 
-				got := output.Data().Data()[(batch*2+position)*2+feature]
+				got := backendtest.HostData(t, output.Data())[(batch*2+position)*2+feature]
 				if math.Abs(float64(got)-want) > 1e-6 {
 					t.Fatalf("batch %d position %d head %d: got %g, want %g", batch, position, feature, got, want)
 				}
@@ -96,7 +98,7 @@ func TestMultiHeadAttention_CausalMaskBlocksFutureValuesAndGradients(t *testing.
 		t.Fatal(err)
 	}
 
-	if !slices.Equal(output.Data().Data()[:2], changed.Data().Data()[:2]) {
+	if !slices.Equal(backendtest.HostData(t, output.Data())[:2], backendtest.HostData(t, changed.Data())[:2]) {
 		t.Fatal("future values changed the first position")
 	}
 
@@ -114,7 +116,7 @@ func TestMultiHeadAttention_CausalMaskBlocksFutureValuesAndGradients(t *testing.
 		t.Fatal(err)
 	}
 
-	for _, gradient := range input.Grad().Data()[2:] {
+	for _, gradient := range backendtest.HostData(t, input.Grad())[2:] {
 		if gradient != 0 {
 			t.Fatal("gradient leaked into a future position")
 		}

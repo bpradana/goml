@@ -124,7 +124,7 @@ func TestMatMul_TileBoundariesAndLayouts(t *testing.T) {
 
 			original := referenceMatMul(a, b)
 
-			for i, value := range got.Data() {
+			for i, value := range hostData(t, got) {
 				var want, magnitude float64
 
 				for p := range k {
@@ -158,7 +158,7 @@ func TestMatMul_NonfiniteProductsAreNotSkipped(t *testing.T) {
 		}
 
 		want := referenceMatMul(a, b)
-		for i, v := range got.Data() {
+		for i, v := range hostData(t, got) {
 			if v != want[i] && !(math.IsNaN(float64(v)) && math.IsNaN(float64(want[i]))) {
 				t.Fatal(i, v, want[i])
 			}
