@@ -18,7 +18,7 @@ The underlying [tensor](../tensor/README.md) module remains an ordinary numerica
 
 The module path is `github.com/bpradana/goml/nn`.
 Activation, layer, loss, and optimizer packages belong to this module.
-Install nn v0.2.0 with `go get github.com/bpradana/goml/nn@v0.2.0`.
+Install nn v0.3.0 with `go get github.com/bpradana/goml/nn@v0.3.0`.
 Its tensor dependency remains at the published v0.1.0 API.
 
 ## Packages
@@ -27,10 +27,12 @@ Its tensor dependency remains at the published v0.1.0 API.
 | --- | --- | --- |
 | `/nn` | `Value`, `Parameter`, numerical operations | Immutable values, differentiable primitives, and graph ownership. |
 | `/nn/layer` | `Layer`, `NewDense`, `NewSequential`, plus the development layers below. | Model composition and parameter discovery. |
-| `/nn/activation` | `NewReLU`, `NewSigmoid`, `NewTanh`, `NewSoftmax` | Activation layers and their derivative rules. |
+| `/nn/activation` | `NewReLU`, `NewSigmoid`, `NewTanh`, `NewSiLU`, `NewSoftmax` | Activation layers and their derivative rules. |
 | `/nn/checkpoint` | `SaveWeights`, `LoadWeights`, `Save`, `Load`, `Marshal`, `Unmarshal` | Weight and built-in network persistence. |
 | `/nn/loss` | `Loss[T]`, `NewMSE`, `NewCrossEntropy` | Scalar objectives with explicit target types. |
 | `/nn/optimizer` | `Optimizer`, `NewSGD`, `NewAdam` | Parameter updates, gradient clearing, and Adam moments. |
+
+Package guides: [layers](layer/README.md), [activations](activation/README.md), [losses](loss/README.md), [optimizers](optimizer/README.md), and [checkpoints](checkpoint/README.md).
 
 Each import starts with `github.com/bpradana/goml`.
 The subpackages depend on nn. nn does not import its subpackages.
@@ -220,13 +222,15 @@ Parameters returns each shared parameter once.
 The [Layer interface](layer/layer.go) contains only Forward and Parameters.
 There is no reflection-based discovery or layer registry.
 
-### Convolution, recurrent, and attention layers
+### Spatial, recurrent, and attention layers
 
-These constructors are available in nn v0.2.0:
+The layer API includes these constructors; pooling and Upsample2D are available in nn v0.3.0:
 
 | Layer | Shape contract |
 | --- | --- |
 | `layer.NewConv2D(in, out, kernel, stride, padding, bias, rng)` | NCHW images to NCHW feature maps. |
+| `layer.NewMaxPool2D(kernel, stride, padding)` | NCHW spatial maxima with differentiable overlapping windows. |
+| `layer.NewUpsample2D(scale, mode)` | NCHW interpolation using layer.Nearest, layer.Bilinear, or layer.Bicubic. |
 | `layer.NewFlatten()` | Preserve batch and flatten the remaining dimensions. |
 | `layer.NewRNN(in, hidden, rng)` | `[batch,time,in]` to `[batch,time,hidden]`. |
 | `layer.NewLSTM(in, hidden, rng)` | Same layout, with explicit hidden and cell state. |
@@ -353,7 +357,14 @@ Finite-difference checks cover operations, reductions, views, activations, and l
 Exact tests cover shared graphs, accumulation, consuming backward, typed loss interfaces, and optimizer references.
 See [validation](../docs/testing.md) and [performance](../docs/performance.md).
 
-nn v0.2.0 adds convolution, recurrent layers, transformer encoders, and checkpoints to the dense-network APIs.
+nn v0.3.0 includes convolution, pooling, interpolation, recurrent layers, transformer encoders, and checkpoints.
 There is no retain-graph option, higher-order autodiff, external pretrained-format importer, or GPU runtime.
 
 Licensed under [MIT](../LICENSE).
+
+## Pretrained object detection
+
+The independent [contrib/nn/yolo module](../contrib/nn/yolo/README.md) runs pretrained YOLOv8n detection using nn v0.3.0.
+Its offline converter folds BatchNorm into convolution weights; inference uses Conv2D, SiLU, MaxPool2D, Upsample2D, slicing, concatenation, and residual additions.
+YOLO model formats, weight conversion, box decoding, and NMS belong to that module.
+The nn runtime retains no Python or external model-runtime dependency.
