@@ -39,12 +39,7 @@ func (s *SGD) Step() error {
 			continue
 		}
 
-		update, err := tensor.Scale(v.Grad(), s.learningRate)
-		if err != nil {
-			return err
-		}
-
-		next, err := tensor.Sub(v.Data(), update)
+		next, err := tensor.SubScaled(v.Data(), v.Grad(), s.learningRate)
 		if err != nil {
 			return err
 		}

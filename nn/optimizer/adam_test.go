@@ -3,6 +3,7 @@ package optimizer
 import (
 	"math"
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/bpradana/goml/nn"
@@ -57,6 +58,30 @@ func TestAdam_MissingGradientsDoNotAdvanceState(t *testing.T) {
 
 	if len(opt.state) != 0 {
 		t.Fatal("missing gradient allocated moment state")
+	}
+
+	leaf, previous := parameter.Value(), parameter.Value().Data()
+	accumulateGradient(t, parameter, []float32{2})
+
+	if err := opt.Step(); err != nil {
+		t.Fatal(err)
+	}
+
+	state := opt.state[parameter]
+	first, second := slices.Clone(state.first), slices.Clone(state.second)
+
+	opt.ZeroGrad()
+
+	if err := opt.Step(); err != nil {
+		t.Fatal(err)
+	}
+
+	if state.steps != 1 || !slices.Equal(first, state.first) || !slices.Equal(second, state.second) {
+		t.Fatal("missing gradient advanced existing state")
+	}
+
+	if parameter.Value() != leaf || previous.Data()[0] != 1 {
+		t.Fatal("update changed parameter identity or previous tensor")
 	}
 }
 

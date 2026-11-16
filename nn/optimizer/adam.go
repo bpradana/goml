@@ -2,7 +2,6 @@ package optimizer
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/bpradana/goml/nn"
 
@@ -75,19 +74,7 @@ func (a *Adam) Step() error {
 
 		state.steps++
 
-		firstCorrection := 1 - math.Pow(float64(a.beta1), float64(state.steps))
-		secondCorrection := 1 - math.Pow(float64(a.beta2), float64(state.steps))
-		values, gradient := v.Data().Data(), v.Grad().Data()
-
-		for i, g := range gradient {
-			state.first[i] = a.beta1*state.first[i] + (1-a.beta1)*g
-			state.second[i] = a.beta2*state.second[i] + (1-a.beta2)*g*g
-			first := float64(state.first[i]) / firstCorrection
-			second := float64(state.second[i]) / secondCorrection
-			values[i] -= float32(float64(a.learningRate) * first / (math.Sqrt(second) + float64(a.epsilon)))
-		}
-
-		next, err := tensor.From(values, v.Data().Shape()...)
+		next, err := tensor.AdamUpdate(v.Data(), v.Grad(), state.first, state.second, a.learningRate, a.beta1, a.beta2, a.epsilon, state.steps)
 		if err != nil {
 			return err
 		}

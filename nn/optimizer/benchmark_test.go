@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/bpradana/goml/nn"
@@ -8,9 +9,13 @@ import (
 )
 
 func BenchmarkOptimizerStep(b *testing.B) {
-	for _, name := range []string{"SGD", "Adam"} {
-		b.Run(name, func(b *testing.B) {
-			data, err := tensor.Ones(128)
+	for _, configuration := range []struct {
+		name string
+		size int
+	}{{"SGD", 128}, {"Adam", 128}, {"SGD", 65536}, {"Adam", 65536}} {
+		name := configuration.name
+		b.Run(fmt.Sprintf("%s/n=%d", name, configuration.size), func(b *testing.B) {
+			data, err := tensor.Ones(configuration.size)
 			if err != nil {
 				b.Fatal(err)
 			}
