@@ -9,9 +9,10 @@
 ![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8)
 ![Execution](https://img.shields.io/badge/CPU-amd64%20%C2%B7%20arm64-555)
 ![simdops](https://img.shields.io/badge/simdops-v0.1.0-blue)
-![tensor](https://img.shields.io/badge/tensor-v0.2.0-blue)
-![nn](https://img.shields.io/badge/nn-v0.4.0-blue)
-![yolo](https://img.shields.io/badge/yolo-v0.2.0-blue)
+![tensor](https://img.shields.io/badge/tensor-v0.3.0-blue)
+![nn](https://img.shields.io/badge/nn-v0.5.0-blue)
+![yolo](https://img.shields.io/badge/yolo-v0.3.0-blue)
+![metal](https://img.shields.io/badge/metal-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Quick start](#quick-start) ·
@@ -28,14 +29,19 @@ goml connects three independently usable libraries: slice kernels, N-dimensional
 tensors, and neural networks. Use `simdops` for allocation-free vector operations.
 Use `tensor` for numerical arrays. Add `nn` when you need differentiation and training.
 
-The runtime uses Go and its standard library. Tensors contain `float32` values,
+The CPU runtime uses Go and its standard library. Tensors contain `float32` values,
 views share immutable storage, and training uses eager reverse-mode differentiation.
 Default builds use scalar kernels. Go's experimental portable SIMD API is optional.
 
-**Module versions:** simdops v0.1.0, tensor v0.2.0, and nn v0.4.0.
+**Module versions:** simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
 The nn release includes convolutional, recurrent, transformer, checkpoint, pooling, SiLU, and spatial interpolation APIs.
-The independent [YOLO module](contrib/nn/yolo/README.md) provides pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.2.0`.
+The independent [YOLO module](contrib/nn/yolo/README.md) provides pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.3.0`.
 See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/README.md) for their APIs and examples.
+
+The optional [Metal backend](contrib/backend/metal/README.md) adds persistent GPU tensors,
+native matrix multiplication and convolution, GPU training, and YOLOv8n on Apple Silicon.
+It owns all CGo and Apple framework integration. CPU applications retain their existing installation path.
+These release targets require upstream publication in the [documented order](docs/releasing.md).
 
 ## Contents
 
@@ -70,7 +76,8 @@ See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/RE
 | Verification | Numerical references, finite-difference checks, fuzzing, race detection, linting, and measured performance baselines. |
 | Object detection | Independent contrib/nn/yolo module with pretrained YOLOv8n conversion, loading, image inference, decoding, and NMS. |
 | Spatial transforms | MaxPool2D and Upsample2D with nearest, bilinear, or bicubic interpolation. |
-| Tooling | A Go workspace and mise tasks for all four modules. GitHub workflows use the same tasks. |
+| Metal | Explicit transfers, resident tensor operations, eager gradients, SGD, Adam, and YOLO inference on supported Macs. |
+| Tooling | A Go workspace with separate CPU and opt-in Metal mise tasks. GitHub workflows use the same tasks. |
 
 ## Install
 
@@ -78,8 +85,8 @@ From your application's Go module, install the library you need:
 
 ```sh
 go get github.com/bpradana/goml/simdops@v0.1.0
-go get github.com/bpradana/goml/tensor@v0.2.0
-go get github.com/bpradana/goml/nn@v0.4.0
+go get github.com/bpradana/goml/tensor@v0.3.0
+go get github.com/bpradana/goml/nn@v0.5.0
 ```
 
 Each command includes that module's dependencies. Go 1.27.3 or later is required.
@@ -340,13 +347,13 @@ The [validation guide](docs/testing.md) records what has been verified.
 ## Known limitations
 
 - **Float32 only.** No dynamic dtype system, float64, or mixed precision.
-- **CPU execution.** No GPU runtimes, CGo, external ML engines, or device abstraction.
+- **Execution.** CPU builds remain pure Go. Metal is an explicit macOS/CGo dependency. CUDA and ROCm are unimplemented reservations.
 - **2D matrix multiplication.** Blocking and selective RHS packing are supported; batched products and parallel matrix workers are not.
 - **Basic indexing.** Unit-step slices and axis permutations, without advanced indexing or negative axes.
 - **Eager graphs.** Backward consumes each graph. There is no retain-graph option, higher-order differentiation, or graph compiler.
 - **Initial model implementations.** Conv2D uses square kernels without groups or dilation. Recurrent layers are unidirectional. Transformer blocks have no dropout, padding masks, or decoder.
 - **Checkpoint scope.** Built-in Sequential networks and weights are supported. Optimizer state, runtime recurrent state, and distributed training are excluded. The separate YOLO module converts one supported pretrained format.
-- **Release evidence.** Native amd64 execution and real-dataset MNIST accuracy remain open validation items. Standalone checks use tensor v0.2.0 and nn v0.4.0 without workspace replacements.
+- **Release evidence.** Native amd64 execution and real-dataset MNIST accuracy remain open validation items. New downstream standalone checks require published upstream versions.
 
 ## Documentation
 

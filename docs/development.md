@@ -45,7 +45,7 @@ mise install --locked go uv golangci-lint \
 ## Choose a task
 
 Scoped tasks use `action:target` names.
-Aggregate tasks run the four ordinary module tasks.
+Aggregate tasks run the four ordinary CPU module tasks. Metal tasks are explicit and separate.
 
 | Purpose | Aggregate | Module example |
 | --- | --- | --- |
@@ -68,13 +68,39 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
 | `test:standalone` | Tests the three core modules with `GOWORK=off`. Requires published upstream versions. |
-| `test:standalone:yolo` | Tests the independent YOLO module with published nn v0.4.0 and tensor v0.2.0. |
+| `test:standalone:yolo` | Tests the independent YOLO module with published nn v0.5.0 and tensor v0.3.0. |
 | `test:converter` | Checks pinned Python converter formatting, lint, and unit tests. |
 | `build:portable` | Cross-compiles Linux amd64/arm64, with CGo disabled, scalar and SIMD. |
 | `bench:record` | Records hardware metadata and repeated scalar/SIMD measurements. |
 | `docs:api` | Prints local GoDoc for the public packages. |
 
 List every task with `mise tasks`.
+
+## Metal development
+
+Native tasks require a Mac with supported Metal hardware, CGo, and Xcode command-line tools.
+The active workspace includes the backend and its separate examples module.
+CUDA and ROCm remain documentation-only modules outside the workspace and normal task graph.
+
+```sh
+mise run fmt:gpu:metal
+mise run fmt:gpu:examples
+mise run fmt:native:metal
+mise run fmt:check:metal
+mise run lint:gpu:metal
+mise run lint:gpu:examples
+mise run test:gpu:metal
+mise run test:gpu:parity
+mise run test:gpu:race
+mise run test:gpu:portable
+```
+
+The Metal Go formatter checks every source file, including inactive build constraints and CGo source.
+Native formatting uses clang-format 21.1.0 through uvx. The native task preserves Go build constraints.
+Use bench:gpu:metal for repeated matrix measurements and bench:gpu:models for model stages.
+The model benchmark needs explicitly supplied local YOLO artifacts. See [GPU measurements](performance/metal.md).
+The manual [Metal workflow](../.github/workflows/metal.yml) requires a self-hosted Mac GPU runner.
+Ordinary CPU CI remains independent of that runner. Standalone dependencies are verified at release time.
 
 ## Daily workflow
 
@@ -148,7 +174,7 @@ mise run deps:verify
 mise run test:standalone
 ```
 
-Current manifests use simdops v0.1.0, tensor v0.2.0, and nn v0.4.0.
+Current manifests use simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
 For a new upstream version, publish that tag before preparing downstream dependencies.
 Go's public proxy can temporarily cache a lookup made before publication.
 Do not add relative replace directives or fabricate checksum files.
@@ -217,4 +243,4 @@ Run `mise run fmt:converter` and `mise run test:converter` when changing Python 
 The converter uses its own uv.lock; update it deliberately with `uv lock --directory contrib/nn/yolo/convert` and review the dependency changes.
 
 Use go.work for cross-module YOLO development. The standalone YOLO release gate
-resolves nn v0.4.0 and tensor v0.2.0 independently of the workspace.
+resolves nn v0.5.0 and tensor v0.3.0 independently of the workspace.

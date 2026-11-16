@@ -175,3 +175,15 @@ Methods with constructor preconditions, such as metadata accessors, require an i
 Immutable tensor reads can run concurrently.
 Caller-owned random generators and nn parameter updates have separate synchronization requirements.
 See [autograd](autograd.md) for model and gradient ownership.
+
+## Explicit GPU storage
+
+CPU storage and numerical contracts remain unchanged. GPU tensors keep the same shape,
+strides, offset, and Float32 layout through opaque, reference-counted storage leases.
+Operations preserve their input device. Mixed devices and unsupported kernels return errors.
+Views retain independent leases and share immutable values.
+
+GPU Data and Contiguous panic. HostData, ToCPU, and MakeContiguous provide explicit fallible alternatives.
+At returns an error for GPU storage. String shows metadata without downloading values.
+Close retained GPU tensors and iteration scopes explicitly. Device shutdown synchronizes pending work.
+See [GPU contracts and migration](gpu.md) for complete ownership and synchronization rules.

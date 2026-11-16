@@ -1,5 +1,22 @@
 # Changelog
 
+## tensor v0.3.0, nn v0.5.0, contrib/nn/yolo v0.3.0, and Metal v0.1.0
+
+Publish compatible tensor, nn, and YOLO versions before the independent Metal backend.
+simdops remains at v0.1.0. CUDA, ROCm, and the nested Metal examples module have no release tags.
+Downstream checksums and standalone checks require the upstream tags to resolve publicly.
+
+- Tensor-owned device contracts, opaque storage leases, explicit transfers, temporary scopes, and fallible host access.
+- Independent Apple Metal backend with cached embedded shaders, persistent buffers, MPS MatMul, and native MPSGraph convolution gradients.
+- Device-resident arithmetic, broadcasting, reductions, layout operations, activations, pooling, and all three spatial interpolation modes.
+- Existing nn models, eager autograd, gradient accumulation, SGD, and Adam on GPU without intermediate array downloads.
+- Explicit gradient and optimizer-state cleanup, safe views, pending-command resource retention, and concurrent cleanup synchronization.
+- Portable checkpoints with explicit GPU transfers and staged restoration preserving parameter identity.
+- YOLOv8n weight transfer, GPU Forward, staged Postprocess, and complete detection at 320 and 640.
+- Minimal, clearly unimplemented CUDA and ROCm module reservations outside the active workspace.
+- Package logos, GPU migration and performance guides, opt-in Mac hardware CI, Metal release-note automation, and runnable examples.
+- Actual M1 Pro parity, convergence, allocation-lifetime, and repeated benchmark evidence in the [Metal report](docs/performance/metal.md).
+
 ## tensor v0.2.0, nn v0.4.0, and contrib/nn/yolo v0.2.0
 
 Publish `tensor/v0.2.0`, then `nn/v0.4.0`, then `contrib/nn/yolo/v0.2.0`.

@@ -52,7 +52,9 @@ nn does not import simdops directly.
 Tensor does not import nn.
 The root workspace supplies local module resolution.
 
-Do not add a root go.mod, Makefile, CGo requirement, or GPU abstraction.
+Do not add a root go.mod or Makefile. Keep CPU modules pure Go.
+Metal implements tensor-owned device contracts in its independent contrib module.
+Keep CGo and Apple frameworks inside that module. CUDA and ROCm remain unimplemented.
 Subpackages remain part of their parent module.
 Do not add relative replace directives to released manifests.
 

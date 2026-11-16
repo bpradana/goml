@@ -9,6 +9,8 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | --- | --- |
 | Use allocation-free slice operations | [simdops](../simdops/README.md) |
 | Work with numerical arrays and views | [tensor](../tensor/README.md) |
+| Run tensor operations and models on Apple Silicon | [Metal](../contrib/backend/metal/README.md) and [GPU contracts](gpu.md) |
+| Inspect GPU parity and measured workloads | [Metal performance](performance/metal.md) |
 | Run pretrained YOLOv8n detection | [YOLO](../contrib/nn/yolo/README.md) |
 | Inspect pretrained numerical comparisons | [YOLO validation](yolo-validation.md) |
 | Build and train a neural network | [nn](../nn/README.md) |
@@ -40,8 +42,8 @@ The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-The release set is simdops v0.1.0, tensor v0.2.0, nn v0.4.0, and contrib/nn/yolo v0.2.0.
-nn resolves tensor v0.2.0; YOLO resolves nn v0.4.0 and tensor v0.2.0.
+The release set is simdops v0.1.0, tensor v0.3.0, nn v0.5.0, and contrib/nn/yolo v0.3.0.
+nn resolves tensor v0.3.0; YOLO resolves nn v0.5.0 and tensor v0.3.0.
 Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from

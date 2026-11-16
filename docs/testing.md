@@ -161,3 +161,17 @@ The independent YOLO module tests kernel layout validation, archive failures, C2
 Normal tests need no pretrained weights or network access.
 The optional real-weight test compares raw logits and retained detections against pinned PyTorch on the exact same Go-prepared input.
 See [YOLO validation](yolo-validation.md) for reproduction commands and measured results.
+
+## Metal validation
+
+Metal tests run on actual Apple M1 Pro hardware through explicit GPU tasks.
+They cover transfers, views, malformed inputs, arithmetic, reductions, MPS MatMul,
+native convolution and gradients, pooling, all interpolation modes, model gradients,
+optimizer references, checkpoint restoration, concurrent scopes, and pending device shutdown.
+The CNN training cleanup test passed 30 consecutive 60-step runs with a stable native allocation baseline.
+YOLO integration tests use explicitly supplied local weights and compare 320 and 640 raw heads and detections.
+
+These checks are separate from ordinary CPU CI. The manual Metal workflow requires a self-hosted Mac GPU runner.
+GOWORK=off checks for the new downstream releases remain deferred until their upstream tags resolve publicly.
+No temporary replacements or invented checksum entries substitute for that release gate.
+The [GPU guide](gpu.md) and [performance report](performance/metal.md) record the exact evidence and limits.

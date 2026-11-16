@@ -197,3 +197,15 @@ The caller owns model and training lifetimes.
 Finite-difference tests cover numerical operations and loss gradients.
 Exact tests cover accumulation, shared dependencies, consumed graphs, and explicit seed shapes.
 The [validation guide](testing.md) describes tolerances, reference calculations, and remaining evidence.
+
+## GPU gradients
+
+The graph remains eager and independent of backend implementation details.
+Backward creates its seed on the output device and performs differentiation through tensor operations.
+Queued GPU errors are synchronized before gradient commit or graph consumption.
+
+GPU leaf gradients own independent leases and accumulate across forward scopes until ZeroGrad.
+Intermediate gradients follow their forward scope's lifetime. Grad handles are borrowed until clearing or replacement.
+Use a batch scope through Forward, Backward, optimizer Step, and ZeroGrad, then close the scope.
+Move parameters before creating an optimizer. Adam owns device moments and provides Close to release them.
+See [GPU training](gpu.md#neural-networks-and-gradients) for lifecycle and checkpoint compatibility.

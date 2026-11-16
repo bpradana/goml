@@ -5,6 +5,7 @@
 goml separates slice kernels, numerical arrays, and differentiation into three Go modules.
 Each module can be imported and released independently.
 A fourth module, contrib/nn/yolo, provides pretrained YOLOv8n inference on top of nn.
+The independent contrib/backend/metal module implements tensor-owned device contracts.
 This guide explains their boundaries and the execution model.
 
 ## Dependency direction
@@ -24,6 +25,7 @@ flowchart TD
     YOLO --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
+    Metal["contrib/backend/metal<br/>native GPU execution"] --> Tensor
     SIMD --> Std["Go standard library"]
 ```
 
@@ -35,11 +37,14 @@ flowchart TD
 
 nn and its subpackages import tensor and never import simdops directly.
 Tensor imports simdops for contiguous arithmetic.
-The runtime has no third-party dependencies beyond the three-module chain.
+CPU execution has no third-party runtime dependencies beyond the three-module chain.
+Metal imports tensor and owns the CGo bridge. Tensor and nn do not import native backends.
 
 ## Workspace and versioned modules
 
 The root [go.work](../go.work) selects `simdops`, `tensor`, `nn`, and `contrib/nn/yolo`.
+It also selects Metal and its separate development examples module.
+CUDA and ROCm reservations remain outside the workspace.
 There is no root `go.mod`.
 The workspace resolves local changes without relative replace directives.
 
@@ -47,10 +52,11 @@ The workspace resolves local changes without relative replace directives.
 | --- | --- |
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
-| [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.2.0` |
-| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.4.0` and `tensor v0.2.0` |
+| [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
+| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.5.0` and `tensor v0.3.0` |
+| [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 
-The version declarations resolve simdops v0.1.0, tensor v0.2.0, and nn v0.4.0.
+The version declarations resolve simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -171,10 +177,12 @@ The [performance report](performance.md) records the existing baseline.
 ## Scope
 
 The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
-nn v0.4.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence, with optimized CPU numerical kernels.
+nn v0.5.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence, with optimized CPU numerical kernels.
 YOLO-specific blocks, archive loading, conversion, decoding, and NMS stay in contrib/nn/yolo.
 The Python converter is an offline tool; no Python or third-party inference runtime is needed by the Go module.
-It has no CGo, GPU backend, device abstraction, JIT, compiled graph engine, or distributed-training layer.
+The optional Metal backend supplies explicit transfers and GPU computation through tensor contracts.
+CPU paths remain pure Go. There is no goml JIT, compiled graph engine, or distributed-training layer.
+See [GPU ownership and migration](gpu.md) for device execution and native resource boundaries.
 
 Future numerical types and additional operations must preserve the ownership and dependency boundaries.
 Internal extension points do not imply public backend or plugin interfaces.

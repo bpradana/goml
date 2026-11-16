@@ -103,3 +103,10 @@ global pools or worker engines.
 
 The local results do not measure native amd64 performance or actual MNIST
 dataset accuracy. Native CI benchmark runs require pushing the repository first.
+
+## Metal measurements
+
+The [Metal report](performance/metal.md) compares the optimized scalar CPU workload with
+resident GPU operations and transfer-inclusive execution on the same M1 Pro.
+It records startup, YOLO stages, complete detection, optimizer steps, and tracked allocation limits.
+Small operations can be slower on Metal because command submission and synchronization dominate.
