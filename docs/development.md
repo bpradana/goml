@@ -19,6 +19,7 @@ mise run check
 
 | Tool | Configured version | Purpose |
 | --- | --- | --- |
+| uv | 0.9.1 | Locked offline YOLO conversion environment. |
 | Go | 1.27.3 | Compiler, tests, vet, module operations. |
 | golangci-lint | 2.15.0 | Static analysis, gofumpt, goimports, whitespace checks. |
 | goimports | Resolved version in mise.lock. | Standalone formatting tool. |
@@ -34,7 +35,7 @@ Personal global mise tools are outside this repository's lockfile.
 If those tools interfere with locked installation, target the project tools explicitly:
 
 ```sh
-mise install --locked go golangci-lint \
+mise install --locked go uv golangci-lint \
   go:golang.org/x/tools/cmd/goimports \
   go:golang.org/x/vuln/cmd/govulncheck \
   go:github.com/sonatype-nexus-community/nancy \
@@ -44,7 +45,7 @@ mise install --locked go golangci-lint \
 ## Choose a task
 
 Scoped tasks use `action:target` names.
-Aggregate tasks run the three ordinary module tasks.
+Aggregate tasks run the four ordinary module tasks.
 
 | Purpose | Aggregate | Module example |
 | --- | --- | --- |
@@ -66,7 +67,9 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:simd` | Tests every module with `GOEXPERIMENT=simd`. |
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
-| `test:standalone` | Tests all modules with `GOWORK=off`. Requires published upstream versions. |
+| `test:standalone` | Tests the three core modules with `GOWORK=off`. Requires published upstream versions. |
+| `test:standalone:yolo` | Tests the independent YOLO module after nn v0.3.0 is published. |
+| `test:converter` | Checks pinned Python converter formatting, lint, and unit tests. |
 | `build:portable` | Cross-compiles Linux amd64/arm64, with CGo disabled, scalar and SIMD. |
 | `bench:record` | Records hardware metadata and repeated scalar/SIMD measurements. |
 | `docs:api` | Prints local GoDoc for the public packages. |
@@ -132,7 +135,7 @@ The [validation guide](testing.md) explains numerical references and gradient ch
 | Task | Purpose |
 | --- | --- |
 | `deps:tidy` | Tidies all module manifests. |
-| `deps:tidy:simdops`, `deps:tidy:tensor`, `deps:tidy:nn` | Tidies one module during an ordered release. |
+| `deps:tidy:simdops`, `deps:tidy:tensor`, `deps:tidy:nn`, `deps:tidy:yolo` | Tidies one module during an ordered release. |
 | `deps:sync` | Synchronizes workspace dependency selections. |
 | `deps:verify` | Verifies downloaded module checksums. |
 
@@ -204,3 +207,14 @@ Initial tool installation and optional data setup require network access.
 
 The workflows install locked tools.
 They are configured locally and have not run on GitHub yet.
+
+## YOLO conversion and validation
+
+Use `mise run convert:yolo -- source.pt destination.goml` for offline conversion, and `mise run example:yolo -- -model destination.goml -image image.jpg` for pure-Go inference.
+The [YOLO README](../contrib/nn/yolo/README.md) documents explicit weight downloads and the optional PyTorch comparison.
+Python is only needed by conversion and reference tools; ordinary Go tests do not download weights.
+Run `mise run fmt:converter` and `mise run test:converter` when changing Python tools.
+The converter uses its own uv.lock; update it deliberately with `uv lock --directory contrib/nn/yolo/convert` and review the dependency changes.
+
+Until nn v0.3.0 is published, use go.work for YOLO development.
+The standalone YOLO release gate and downstream tidy require that published version; keep them separate from the core standalone gate during bootstrap.

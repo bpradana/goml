@@ -1,6 +1,6 @@
 # Documentation
 
-goml provides three independently usable Go modules.
+goml provides three core Go modules and an independent YOLO inference module.
 The [project README](../README.md) introduces the APIs and provides the local quick start.
 
 ## Choose a guide
@@ -9,6 +9,8 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | --- | --- |
 | Use allocation-free slice operations | [simdops](../simdops/README.md) |
 | Work with numerical arrays and views | [tensor](../tensor/README.md) |
+| Run pretrained YOLOv8n detection | [YOLO](../contrib/nn/yolo/README.md) |
+| Inspect pretrained numerical comparisons | [YOLO validation](yolo-validation.md) |
 | Build and train a neural network | [nn](../nn/README.md) |
 | Use convolution, recurrent state, or transformer blocks | [Layers](layers.md) |
 | Run generated-data training programs | [Neural network examples](../nn/examples/README.md) |
@@ -31,15 +33,16 @@ Run this command from the repository root:
 mise run docs:api
 ```
 
-It prints GoDoc for the three modules and nn's activation, checkpoint, layer, loss, and optimizer packages.
+It prints GoDoc for the four modules and nn's activation, checkpoint, layer, loss, and optimizer packages.
 Exported function comments define input constraints, output shapes, errors, and ownership.
 
 The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-The module versions are simdops v0.1.0, tensor v0.1.0, and nn v0.2.0.
-All three modules pass local standalone checks using published upstream dependencies.
+The release set is simdops v0.1.0, tensor v0.1.0, nn v0.3.0, and contrib/nn/yolo v0.1.0.
+The three core modules resolve published upstream dependencies.
+YOLO standalone checks require publication of nn v0.3.0 and subsequent checksum generation.
 Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from

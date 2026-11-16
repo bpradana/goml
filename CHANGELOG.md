@@ -1,5 +1,19 @@
 # Changelog
 
+## nn v0.3.0 and contrib/nn/yolo v0.1.0
+
+Tensor and simdops remain at v0.1.0. Release nn/v0.3.0 before contrib/nn/yolo/v0.1.0.
+
+- SiLU activation with stable evaluation and eager differentiation.
+- NCHW MaxPool2D with negative-infinity padding and overlapping-window gradients.
+- Upsample2D with nearest, bilinear, and bicubic modes, half-pixel interpolation, and input gradients.
+- Checkpoint round trips for all new built-in spatial layers and SiLU.
+- Independent YOLOv8n detection module with immutable model loading, RGB preprocessing, DFL decoding, and class-aware NMS.
+- Locked offline conversion from trusted pretrained PyTorch checkpoints with BatchNorm folding and exact float32 kernel layout conversion.
+- A pure-Go image-detection command and optional numerical comparison against pinned PyTorch outputs.
+- Nested-module GitHub release automation, workspace tasks, and dedicated standalone release validation.
+- Package and example READMEs throughout nn, plus conversion, inference, validation, and release guides.
+
 ## nn v0.2.0
 
 Tensor and simdops remain at v0.1.0. Their APIs and nn's published upstream requirements are unchanged.

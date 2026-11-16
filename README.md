@@ -10,7 +10,8 @@
 ![Execution](https://img.shields.io/badge/CPU-amd64%20%C2%B7%20arm64-555)
 ![simdops](https://img.shields.io/badge/simdops-v0.1.0-blue)
 ![tensor](https://img.shields.io/badge/tensor-v0.1.0-blue)
-![nn](https://img.shields.io/badge/nn-v0.2.0-blue)
+![nn](https://img.shields.io/badge/nn-v0.3.0-blue)
+![yolo](https://img.shields.io/badge/yolo-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Quick start](#quick-start) ·
@@ -31,8 +32,9 @@ The runtime uses Go and its standard library. Tensors contain `float32` values,
 views share immutable storage, and training uses eager reverse-mode differentiation.
 Default builds use scalar kernels. Go's experimental portable SIMD API is optional.
 
-**Module versions:** simdops v0.1.0, tensor v0.1.0, and nn v0.2.0.
-The nn release includes convolutional, recurrent, transformer, and checkpoint APIs.
+**Module versions:** simdops v0.1.0, tensor v0.1.0, and nn v0.3.0.
+The nn release includes convolutional, recurrent, transformer, checkpoint, pooling, SiLU, and spatial interpolation APIs.
+The independent [YOLO module](contrib/nn/yolo/README.md) adds pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.1.0`.
 See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/README.md) for their APIs and examples.
 
 ## Contents
@@ -66,7 +68,9 @@ See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/RE
 | Checkpoints | Save weights or complete built-in Sequential networks, preserving shared layers and exact float32 values. |
 | Training | Typed MSE and cross-entropy loss objects, SGD, Adam, and explicit inference without gradient graphs. |
 | Verification | Numerical references, finite-difference checks, fuzzing, race detection, linting, and measured performance baselines. |
-| Tooling | A Go workspace and mise tasks for all three modules. GitHub workflows use the same tasks. |
+| Object detection | Independent contrib/nn/yolo module with pretrained YOLOv8n conversion, loading, image inference, decoding, and NMS. |
+| Spatial transforms | MaxPool2D and Upsample2D with nearest, bilinear, or bicubic interpolation. |
+| Tooling | A Go workspace and mise tasks for all four modules. GitHub workflows use the same tasks. |
 
 ## Install
 
@@ -75,7 +79,7 @@ From your application's Go module, install the library you need:
 ```sh
 go get github.com/bpradana/goml/simdops@v0.1.0
 go get github.com/bpradana/goml/tensor@v0.1.0
-go get github.com/bpradana/goml/nn@v0.2.0
+go get github.com/bpradana/goml/nn@v0.3.0
 ```
 
 Each command includes that module's dependencies. Go 1.27.3 or later is required.
@@ -132,6 +136,7 @@ flowchart TD
     Activation["nn/activation · element-wise layers"] --> NN
     Loss["nn/loss · typed loss objects"] --> NN
     Optimizer["nn/optimizer · parameter updates"] --> NN
+    YOLO["contrib/nn/yolo · pretrained detection"] --> NN
     NN --> Tensor["tensor · immutable numerical arrays"]
     Tensor --> SIMD["simdops · scalar and optional SIMD kernels"]
     SIMD --> Std["Go standard library"]
@@ -142,6 +147,7 @@ flowchart TD
 | simdops | `github.com/bpradana/goml/simdops` | [Slice APIs and numerical contracts](simdops/README.md) |
 | tensor | `github.com/bpradana/goml/tensor` | [Arrays, views, and mathematics](tensor/README.md) |
 | nn | `github.com/bpradana/goml/nn` | [Differentiation and model training](nn/README.md) |
+| yolo | `github.com/bpradana/goml/contrib/nn/yolo` | [Pretrained object detection](contrib/nn/yolo/README.md) |
 
 Each module has its own `go.mod`. The root `go.work` selects local versions.
 Layer, loss, and optimizer packages belong to the nn module. They do not create
@@ -158,13 +164,15 @@ additional modules. There is no root `go.mod`.
 | `tensor/arithmetic.go`, `reduction.go`, `matmul.go` | Numerical operations and 2D multiplication. |
 | `tensor/internal/shape/` | Checked layouts and broadcast compatibility. |
 | `nn/value.go`, `autograd.go`, `operation.go` | Values, graph traversal, and custom backward registration. |
-| `nn/layer/` | Dense and Sequential composition. |
-| `nn/activation/` | ReLU, Sigmoid, and Tanh layers with their derivative rules. |
+| `nn/layer/` | Dense, convolutional, recurrent, attention, pooling, interpolation, and Sequential composition. |
+| `nn/activation/` | ReLU, Sigmoid, Tanh, SiLU, and Softmax with their derivative rules. |
 | `nn/loss/` | Loss interface, MSE, and stable cross-entropy implementations. |
 | `nn/optimizer/` | SGD, Adam, and optimizer state. |
-| `nn/examples/` | Linear regression, XOR, and MNIST. |
+| `nn/checkpoint/` | Checked weight files and complete built-in network persistence. |
+| `nn/examples/` | Generated-data training examples and local-data MNIST. |
+| `contrib/nn/yolo/` | Independent YOLOv8n inference, model archives, and offline conversion. |
 | `docs/` | Architecture, contracts, development, validation, and releases. |
-| `.github/workflows/` | Quality checks, SIMD checks, and benchmarks. |
+| `.github/workflows/` | Quality, SIMD, converter checks, benchmarks, and module release notes. |
 
 Implementation files have matching test files where they contain testable behavior.
 See the [architecture guide](docs/architecture.md) for boundaries and ownership.
@@ -335,7 +343,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 - **Basic indexing.** Unit-step slices and axis permutations, without advanced indexing or negative axes.
 - **Eager graphs.** Backward consumes each graph. There is no retain-graph option, higher-order differentiation, or graph compiler.
 - **Initial model implementations.** Conv2D uses square kernels without groups or dilation. Recurrent layers are unidirectional. Transformer blocks have no dropout, padding masks, or decoder.
-- **Checkpoint scope.** Built-in Sequential networks and weights are supported. Optimizer state, runtime recurrent state, external pretrained formats, and distributed training are excluded.
+- **Checkpoint scope.** Built-in Sequential networks and weights are supported. Optimizer state, runtime recurrent state, and distributed training are excluded. The separate YOLO module converts one supported pretrained format.
 - **Release evidence.** Native amd64 execution and real-dataset MNIST accuracy remain open validation items. Published upstream dependencies pass local standalone checks.
 
 ## Documentation

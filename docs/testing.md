@@ -61,7 +61,8 @@ They perturb every input element and every trainable parameter element.
 | Matrix multiplication | Left and right derivatives against finite differences. |
 | Reductions | Selected axes and multiple reduced axes. |
 | Views and sequence assembly | Reshape, inverse transpose, slice scattering, concatenation, and contiguous materialization. |
-| Activations | ReLU away from zero, Sigmoid, Tanh, and Softmax along different axes. |
+| Activations | ReLU away from zero, Sigmoid, Tanh, SiLU, and Softmax along different axes. |
+| Spatial transforms | MaxPool2D argmax scattering and all Upsample2D interpolation modes against weighted finite differences. |
 | Losses | MSE and stable cross-entropy in nn/loss. |
 | Custom operations | Output seeds, callback errors, exact input-gradient shapes, and inference behavior. |
 | Conv2D | Input and kernel derivatives across batches, channels, stride, and zero padding. |
@@ -153,3 +154,10 @@ File tests check replacement, permissions, temporary-file cleanup, unsupported k
 
 Update this evidence when validating a release candidate.
 Do not describe configured workflows or synthetic fixtures as completed deployment or dataset validation.
+
+## Pretrained YOLO validation
+
+The independent YOLO module tests kernel layout validation, archive failures, C2f and SPPF branch order, RGB letterboxing, stable DFL decoding, and class-aware NMS.
+Normal tests need no pretrained weights or network access.
+The optional real-weight test compares raw logits and retained detections against pinned PyTorch on the exact same Go-prepared input.
+See [YOLO validation](yolo-validation.md) for reproduction commands and measured results.

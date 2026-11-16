@@ -2,7 +2,7 @@
 
 [Documentation](README.md) · [nn API](../nn/README.md) · [Examples](../nn/examples/README.md)
 
-This guide describes the convolution, recurrent, attention, and transformer layers in nn v0.2.0.
+This guide describes the spatial, recurrent, attention, and transformer layers in nn v0.3.0.
 They use the existing tensor v0.1.0 API and require no new runtime dependencies.
 
 ## Choose a layer
@@ -58,8 +58,24 @@ Overlapping patches add their gradient contributions into the original image pos
 The matrix product and bias use the existing differentiable operations.
 
 The current implementation allocates a full patch matrix.
-It does not support dilation, groups, asymmetric padding, or pooling.
+Conv2D does not support dilation, groups, or asymmetric padding.
+Use the separate MaxPool2D layer for pooling.
 Large images can require substantial temporary memory.
+
+## Pooling and interpolation
+
+NewMaxPool2D(kernel, stride, padding) computes NCHW spatial maxima with floor output sizes and negative-infinity padding.
+Padding must lie in [0,kernel/2]. Finite ties select the first input; the first NaN propagates.
+Backward sums contributions from overlapping windows.
+
+NewUpsample2D(scale, mode) enlarges both spatial axes by a positive integer scale.
+Choose layer.Nearest, layer.Bilinear, or layer.Bicubic explicitly.
+Bilinear and bicubic use half-pixel coordinates, align_corners=false, and replicated edge pixels.
+Bicubic uses coefficient -0.75 and may overshoot the input range. No antialias filter is applied.
+All modes differentiate with respect to their input.
+
+SiLU, MaxPool2D, and Upsample2D round-trip through checkpoint.Save and Load.
+See the [layer package guide](../nn/layer/README.md) for composition examples and the [YOLO module](../contrib/nn/yolo/README.md) for their pretrained inference use.
 
 ## Recurrent layers and state
 

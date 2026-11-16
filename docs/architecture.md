@@ -4,6 +4,7 @@
 
 goml separates slice kernels, numerical arrays, and differentiation into three Go modules.
 Each module can be imported and released independently.
+A fourth module, contrib/nn/yolo, provides pretrained YOLOv8n inference on top of nn.
 This guide explains their boundaries and the execution model.
 
 ## Dependency direction
@@ -18,6 +19,9 @@ flowchart TD
         Checkpoint["nn/checkpoint<br/>network and weight persistence"] --> Layer
         Checkpoint --> Core
     end
+    YOLO["contrib/nn/yolo<br/>converted pretrained detection"] --> Layer
+    YOLO --> Checkpoint
+    YOLO --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
     SIMD --> Std["Go standard library"]
@@ -35,7 +39,7 @@ The runtime has no third-party dependencies beyond the three-module chain.
 
 ## Workspace and versioned modules
 
-The root [go.work](../go.work) selects `simdops`, `tensor`, and `nn`.
+The root [go.work](../go.work) selects `simdops`, `tensor`, `nn`, and `contrib/nn/yolo`.
 There is no root `go.mod`.
 The workspace resolves local changes without relative replace directives.
 
@@ -44,8 +48,10 @@ The workspace resolves local changes without relative replace directives.
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.1.0` |
+| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.3.0` and `tensor v0.1.0` |
 
-The version declarations resolve published v0.1.0 upstream module tags.
+The core version declarations resolve published v0.1.0 upstream module tags.
+The YOLO module requires nn v0.3.0, which must be published before its standalone dependency checks.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -165,7 +171,9 @@ The [performance report](performance.md) records the existing baseline.
 ## Scope
 
 The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
-nn v0.2.0 includes convolution, recurrent layers, transformer encoder blocks, and model persistence.
+nn v0.3.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence.
+YOLO-specific blocks, archive loading, conversion, decoding, and NMS stay in contrib/nn/yolo.
+The Python converter is an offline tool; no Python or third-party inference runtime is needed by the Go module.
 It has no CGo, GPU backend, device abstraction, JIT, compiled graph engine, or distributed-training layer.
 
 Future numerical types and additional operations must preserve the ownership and dependency boundaries.
