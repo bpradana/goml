@@ -43,6 +43,11 @@ type softmaxConfig struct {
 	Axis int `json:"axis"`
 }
 
+type upsampleConfig struct {
+	Scale int          `json:"scale"`
+	Mode  UpsampleMode `json:"mode"`
+}
+
 // MarshalConfig describes a Sequential architecture as JSON without its weights.
 // Parameter references follow model.Parameters order. Shared layers and parameters
 // retain their identity through references. Restore rebuilds this description with
@@ -162,6 +167,20 @@ func describeLayer(stage Layer) (layerDefinition, []Layer, []*nn.Parameter, erro
 		definition.Type = "conv2d"
 		config = convolutionConfig{Kernel: value.kernel, Stride: value.stride, Padding: value.padding}
 		children = []Layer{value.projection}
+	case *MaxPool2D:
+		if value == nil || value.kernel <= 0 {
+			return definition, nil, nil, fmt.Errorf("nn: config: uninitialized pooling")
+		}
+
+		definition.Type = "maxpool2d"
+		config = convolutionConfig{Kernel: value.kernel, Stride: value.stride, Padding: value.padding}
+	case *Upsample2D:
+		if value == nil || value.scale <= 0 {
+			return definition, nil, nil, fmt.Errorf("nn: config: uninitialized upsampling")
+		}
+
+		definition.Type = "upsample2d"
+		config = upsampleConfig{Scale: value.scale, Mode: value.mode}
 	case *RNN:
 		if value == nil || value.inputProjection == nil || value.hiddenProjection == nil {
 			return definition, nil, nil, fmt.Errorf("nn: config: uninitialized rnn")
@@ -217,6 +236,12 @@ func describeLayer(stage Layer) (layerDefinition, []Layer, []*nn.Parameter, erro
 		}
 
 		definition.Type = "tanh"
+	case *activation.SiLU:
+		if value == nil {
+			return definition, nil, nil, fmt.Errorf("nn: config: nil silu")
+		}
+
+		definition.Type = "silu"
 	case *activation.Softmax:
 		if value == nil || value.Axis() < 0 {
 			return definition, nil, nil, fmt.Errorf("nn: config: invalid softmax axis")

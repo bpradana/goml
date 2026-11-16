@@ -160,6 +160,7 @@ func restoreLayer(definition layerDefinition, children []Layer, parameters []*nn
 		"conv2d": {1, 0}, "rnn": {2, 0}, "lstm": {2, 0}, "attention": {4, 0},
 		"layer_norm": {0, 2}, "transformer_encoder": {5, 0},
 		"relu": {0, 0}, "sigmoid": {0, 0}, "tanh": {0, 0}, "softmax": {0, 0},
+		"silu": {0, 0}, "maxpool2d": {0, 0}, "upsample2d": {0, 0},
 		"flatten": {0, 0}, "last_step": {0, 0}, "positional_encoding": {0, 0},
 	}
 	if expected, ok := counts[definition.Type]; ok {
@@ -170,7 +171,7 @@ func restoreLayer(definition layerDefinition, children []Layer, parameters []*nn
 		return nil, fmt.Errorf("unsupported layer type %q", definition.Type)
 	}
 
-	if definition.Type != "conv2d" && definition.Type != "attention" && definition.Type != "layer_norm" && definition.Type != "softmax" && len(definition.Config) != 0 {
+	if definition.Type != "conv2d" && definition.Type != "maxpool2d" && definition.Type != "upsample2d" && definition.Type != "attention" && definition.Type != "layer_norm" && definition.Type != "softmax" && len(definition.Config) != 0 {
 		if err := decodeConfig(definition.Config, &struct{}{}); err != nil {
 			return nil, err
 		}
@@ -346,6 +347,22 @@ func restoreLayer(definition layerDefinition, children []Layer, parameters []*nn
 		}, nil
 	case "relu":
 		return activation.NewReLU(), nil
+	case "silu":
+		return activation.NewSiLU(), nil
+	case "maxpool2d":
+		var config convolutionConfig
+		if err := decodeConfig(definition.Config, &config); err != nil {
+			return nil, err
+		}
+
+		return NewMaxPool2D(config.Kernel, config.Stride, config.Padding)
+	case "upsample2d":
+		var config upsampleConfig
+		if err := decodeConfig(definition.Config, &config); err != nil {
+			return nil, err
+		}
+
+		return NewUpsample2D(config.Scale, config.Mode)
 	case "sigmoid":
 		return activation.NewSigmoid(), nil
 	case "tanh":

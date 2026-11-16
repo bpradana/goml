@@ -52,6 +52,7 @@ func TestMarshalConfig_RejectsUnsupportedNilAndUninitializedLayers(t *testing.T)
 	for _, stage := range []Layer{
 		unsupportedConfigLayer{values: []int{1}},
 		&Dense{}, &Conv2D{}, &RNN{}, &LSTM{}, &LayerNorm{}, &MultiHeadAttention{}, &TransformerEncoder{},
+		&MaxPool2D{}, &Upsample2D{}, (*activation.SiLU)(nil),
 		(*Sequential)(nil), (*activation.ReLU)(nil), (*activation.Sigmoid)(nil), (*activation.Tanh)(nil), (*activation.Softmax)(nil),
 		(*Flatten)(nil), (*LastStep)(nil), (*PositionalEncoding)(nil), activation.NewSoftmax(-1),
 	} {

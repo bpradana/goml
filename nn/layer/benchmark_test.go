@@ -152,3 +152,47 @@ func BenchmarkAdvancedLayers(b *testing.B) {
 		})
 	}
 }
+
+func BenchmarkSpatialTransforms(b *testing.B) {
+	data, err := tensor.Ones(1, 16, 32, 32)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	input, err := nn.Inference(data)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	pool, err := NewMaxPool2D(3, 1, 1)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.Run("MaxPool2D", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			if _, err := pool.Forward(input); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	for _, mode := range []UpsampleMode{Nearest, Bilinear, Bicubic} {
+		b.Run(string(mode), func(b *testing.B) {
+			stage, err := NewUpsample2D(2, mode)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			b.ReportAllocs()
+
+			for b.Loop() {
+				if _, err := stage.Forward(input); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}

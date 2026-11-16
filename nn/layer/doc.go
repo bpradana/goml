@@ -7,8 +7,8 @@
 // generator. Layers from package activation also implement Layer and have no
 // trainable parameters.
 //
-// Conv2D accepts NCHW images. RNN and LSTM accept batch-first [batch,time,features]
-// sequences and expose explicit recurrent state through ForwardState. Attention
+// Conv2D, MaxPool2D, and Upsample2D accept NCHW images. RNN and LSTM accept
+// batch-first [batch,time,features] sequences and expose explicit recurrent state through ForwardState. Attention
 // and TransformerEncoder use the same sequence layout. PositionalEncoding adds
 // fixed position information. LastStep and Flatten adapt outputs for Dense.
 //

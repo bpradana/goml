@@ -1,7 +1,7 @@
-// Package activation provides ReLU, Sigmoid, Tanh, and Softmax activation layers.
+// Package activation provides ReLU, Sigmoid, Tanh, SiLU, and Softmax activation layers.
 //
-// Construct layers with NewReLU, NewSigmoid, NewTanh, or NewSoftmax. The concrete types
-// implement layer.Layer through Forward and Parameters, so they compose directly
+// Construct layers with NewReLU, NewSigmoid, NewTanh, NewSiLU, or NewSoftmax.
+// The concrete types implement layer.Layer through Forward and Parameters, so they compose directly
 // with layer.NewSequential. No separate activation interface is required.
 //
 // Forward preserves the input shape and registers derivatives through

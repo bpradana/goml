@@ -7,8 +7,46 @@ import (
 	"testing"
 
 	"github.com/bpradana/goml/nn"
+	"github.com/bpradana/goml/nn/activation"
 	"github.com/bpradana/goml/tensor"
 )
+
+func TestRestore_RoundTripsSiLUPoolingAndUpsampling(t *testing.T) {
+	for _, mode := range []UpsampleMode{Nearest, Bilinear, Bicubic} {
+		pool, _ := NewMaxPool2D(3, 1, 1)
+		upsample, _ := NewUpsample2D(2, mode)
+		model, _ := NewSequential(activation.NewSiLU(), pool, upsample)
+
+		config, err := MarshalConfig(model)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		restored, err := Restore(config, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		input, _ := tensor.From([]float32{-1, 2, 3, -4}, 1, 1, 2, 2)
+
+		want, err := model.Predict(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := restored.Predict(input)
+		if err != nil || !slices.Equal(got.Data(), want.Data()) || !slices.Equal(got.Shape(), want.Shape()) {
+			t.Fatalf("round-trip mismatch: %v %v", got, err)
+		}
+	}
+
+	for _, stage := range []string{`{"type":"maxpool2d","config":{"kernel":3,"stride":0,"padding":1}}`, `{"type":"upsample2d","config":{"scale":-1}}`, `{"type":"silu","config":{"unknown":1}}`} {
+		data := []byte(`{"root":0,"layers":[{"type":"sequential","children":[1]},` + stage + `]}`)
+		if _, err := Restore(data, nil); err == nil {
+			t.Fatal("invalid config accepted")
+		}
+	}
+}
 
 func TestRestore_PreservesSharingAndUsesSuppliedTrainableParameters(t *testing.T) {
 	dense, err := NewDense(2, 2, true, rand.New(rand.NewPCG(1, 2)))
