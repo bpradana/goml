@@ -5,8 +5,9 @@
 This example trains a dense classifier or a convolutional neural network on local MNIST files.
 Both models use a fixed seed, ReLU, stable cross-entropy, and Adam.
 The program reports mean training cross-entropy after each epoch.
+After training, it saves the network and a separate weights-only checkpoint under data/.
 
-The CNN option requires the development checkout. It is not included in nn/v0.1.0.
+The dense and CNN options, checkpoint files, and inference mode are included in nn v0.2.0.
 
 Dataset downloads are explicit.
 Unit tests use generated local IDX fixtures and do not access the dataset host.
@@ -48,10 +49,16 @@ mise run example:mnist -- -model cnn -limit 1000 -epochs 3 -batch 32
 | `-limit` | `1000` | Number of examples selected from the files. |
 | `-epochs` | `3` | Number of training epochs. |
 | `-batch` | `32` | Maximum batch size. The last batch can be smaller. |
+| `-save-model` | `data/mnist-model.goml` | Architecture and weight output file. Empty disables this save. |
+| `-save-weights` | `data/mnist-weights.goml` | Weights-only output file. Empty disables this save. |
+| `-load-model` | Empty. | Restore architecture and weights instead of building a new model. |
+| `-load-weights` | Empty. | Restore weights into the selected `-model` architecture. |
+| `-predict` | `false` | Evaluate a loaded checkpoint without training or saving. |
 
 Limit, epochs, and batch must be positive.
 Limit cannot exceed the available image and label counts.
 An unknown model name returns an error before the program opens dataset files.
+When load-model is supplied, the saved architecture takes precedence over model.
 
 The loader reads complete IDX payloads before selecting the training limit.
 A smaller limit reduces training arrays but does not reduce dataset-file reads.
@@ -90,6 +97,53 @@ Batches use the selected data in file order.
 The example does not add data shuffling or an evaluation split.
 Conv2D allocates temporary patch matrices. Smaller batches reduce their memory requirement.
 
+## Save, load, and predict
+
+Training saves both checkpoint kinds by default:
+
+```sh
+mise run example:mnist -- -model cnn -limit 1000 -epochs 3
+```
+
+The program reports the network and weights output paths after successful saves.
+Files under data/ are ignored by Git.
+Each save replaces its destination only after a complete write.
+The network and weights output paths must differ.
+
+Load the complete network and run inference on the selected images:
+
+```sh
+mise run example:mnist -- -load-model data/mnist-model.goml -predict -limit 1000
+```
+
+The saved architecture determines whether the network is dense or convolutional.
+Predict reports accuracy and mean cross-entropy for the supplied image and label files.
+The default files are training data, so this default metric is not held-out accuracy.
+Predict does not train, clear existing model files, or save new checkpoints.
+
+Start further training from a saved network:
+
+```sh
+mise run example:mnist -- -load-model data/mnist-model.goml -epochs 2
+```
+
+Alternatively, load only weights into a matching architecture:
+
+```sh
+mise run example:mnist -- -model cnn -load-weights data/mnist-weights.goml -epochs 2
+```
+
+The two load flags are mutually exclusive.
+Predict requires one of them. Training epochs must be positive during training.
+Loaded weights start with a new Adam optimizer. Optimizer moments and epoch counters are not saved.
+See the [checkpoint contract](../../checkpoint/README.md) for format limits, validation, and shared-layer behavior.
+
+Disable both saves when only a training demonstration is needed:
+
+```sh
+mise run example:mnist -- -model cnn -save-model '' -save-weights ''
+```
+
 ## Input validation
 
 The loader checks gzip reads, IDX magic numbers, image dimensions, counts, and exact payload lengths.
@@ -113,7 +167,9 @@ The source compiles as part of nn's tests.
 Fixture tests verify valid and malformed IDX data and a complete training step.
 Both architectures run through multiple epochs and a partial final batch on local fixtures.
 Model tests check logit shapes, finite gradients for every parameter, and seeded inference predictions.
-The reported metric is training loss.
+Persistence tests train, save, load, compare predictions, and warm-start both architectures.
+Inference tests check weighted partial-batch loss and ensure prediction does not rewrite checkpoints.
+Training reports training loss. Predict reports metrics for the explicitly selected files.
 
 Real-dataset convergence and held-out accuracy were not measured for this checkout.
 Do not treat fixture tests or lower training loss as an accuracy result.

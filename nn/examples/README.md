@@ -18,9 +18,8 @@ Ordinary tests compile and execute the generated-data examples.
 | [Transformer](transformer/main.go) | `mise run example:transformer` | Recover the first token at the final position. | Eight sequences with fixed feature encoding. |
 | [MNIST](mnist/README.md) | `mise run example:mnist` | Digit classification with a dense network, or a CNN using `-model cnn`. | Explicitly downloaded local IDX files. |
 
-The convolution, RNN, LSTM, and transformer examples require the development checkout.
-They are not included in nn/v0.1.0.
-The MNIST CNN option also requires this checkout:
+The convolution, RNN, LSTM, transformer, and MNIST CNN examples are included in nn v0.2.0.
+Run the MNIST CNN with:
 
 ```sh
 mise run example:mnist -- -model cnn -limit 1000 -epochs 3 -batch 32
