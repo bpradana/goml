@@ -18,8 +18,8 @@ The underlying [tensor](../tensor/README.md) module remains an ordinary numerica
 
 The module path is `github.com/bpradana/goml/nn`.
 Activation, layer, loss, and optimizer packages belong to this module.
-Install nn v0.3.0 with `go get github.com/bpradana/goml/nn@v0.3.0`.
-Its tensor dependency remains at the published v0.1.0 API.
+Install nn v0.4.0 with `go get github.com/bpradana/goml/nn@v0.4.0`.
+It requires tensor v0.2.0 for the optimized convolution, concatenation, and parameter-update kernels.
 
 ## Packages
 
@@ -357,14 +357,14 @@ Finite-difference checks cover operations, reductions, views, activations, and l
 Exact tests cover shared graphs, accumulation, consuming backward, typed loss interfaces, and optimizer references.
 See [validation](../docs/testing.md) and [performance](../docs/performance.md).
 
-nn v0.3.0 includes convolution, pooling, interpolation, recurrent layers, transformer encoders, and checkpoints.
+nn v0.4.0 includes convolution, pooling, interpolation, recurrent layers, transformer encoders, and checkpoints, with optimized CPU numerical kernels.
 There is no retain-graph option, higher-order autodiff, external pretrained-format importer, or GPU runtime.
 
 Licensed under [MIT](../LICENSE).
 
 ## Pretrained object detection
 
-The independent [contrib/nn/yolo module](../contrib/nn/yolo/README.md) runs pretrained YOLOv8n detection using nn v0.3.0.
+The independent [contrib/nn/yolo module](../contrib/nn/yolo/README.md) runs pretrained YOLOv8n detection using nn v0.4.0.
 Its offline converter folds BatchNorm into convolution weights; inference uses Conv2D, SiLU, MaxPool2D, Upsample2D, slicing, concatenation, and residual additions.
 YOLO model formats, weight conversion, box decoding, and NMS belong to that module.
 The nn runtime retains no Python or external model-runtime dependency.

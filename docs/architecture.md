@@ -47,11 +47,10 @@ The workspace resolves local changes without relative replace directives.
 | --- | --- |
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
-| [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.1.0` |
-| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.3.0` and `tensor v0.1.0` |
+| [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.2.0` |
+| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.4.0` and `tensor v0.2.0` |
 
-The core version declarations resolve published v0.1.0 upstream module tags.
-The YOLO module requires nn v0.3.0, which must be published before its standalone dependency checks.
+The version declarations resolve simdops v0.1.0, tensor v0.2.0, and nn v0.4.0.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -148,7 +147,8 @@ Loss implementations live in nn/loss. MSE composes public nn operations.
 Activations and CrossEntropy register validated single-input backward rules through nn.NewOperation.
 LayerNorm uses nn.NewMultiOperation to connect input, scale, and bias gradients.
 Recurrent and attention layers compose ordinary differentiable operations.
-Conv2D extracts differentiable patches before matrix multiplication.
+Conv2D training extracts differentiable patches before matrix multiplication;
+inference uses bounded patch tiles in tensor and writes NCHW output directly.
 The [layer guide](layers.md) shows the model paths and shape contracts.
 
 MSE uses `*nn.Value` targets.
@@ -171,7 +171,7 @@ The [performance report](performance.md) records the existing baseline.
 ## Scope
 
 The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
-nn v0.3.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence.
+nn v0.4.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence, with optimized CPU numerical kernels.
 YOLO-specific blocks, archive loading, conversion, decoding, and NMS stay in contrib/nn/yolo.
 The Python converter is an offline tool; no Python or third-party inference runtime is needed by the Go module.
 It has no CGo, GPU backend, device abstraction, JIT, compiled graph engine, or distributed-training layer.

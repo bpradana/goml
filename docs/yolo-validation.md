@@ -4,6 +4,9 @@
 
 This report records local validation for nn v0.3.0 and contrib/nn/yolo v0.1.0 on 2026-11-16.
 It distinguishes numerical parity from accuracy, portability, and release publication.
+These are historical results. The [CPU performance report](performance/cpu.md)
+records the tensor v0.2.0, nn v0.4.0, and YOLO v0.2.0 optimization measurements
+and repeated PyTorch reference validation.
 
 ## Environment and artifacts
 
@@ -102,6 +105,7 @@ It does not establish dataset mAP, robustness, parity for other YOLO variants, o
 Native execution was checked on macOS arm64; Linux amd64/arm64 cross-compilation does not substitute for native runner execution.
 GitHub-hosted workflows and release publication are separate maintainer operations.
 
-YOLO standalone resolution requires the new nn/v0.3.0 tag to be publicly available.
-Its checksum must be generated after that publication, followed by test:standalone:yolo, before publishing contrib/nn/yolo/v0.1.0.
+The current YOLO v0.2.0 manifests require nn v0.4.0 and tensor v0.2.0.
+Use `GOWORK=off mise run deps:tidy:yolo` and `mise run test:standalone:yolo`
+to verify those versioned dependencies and their generated checksums.
 The workspace provides local development resolution without a committed replace directive.

@@ -17,7 +17,7 @@ Contiguous arithmetic uses [simdops](../simdops/README.md).
 Shape validation, indexing, and memory ownership remain part of tensor's contract.
 
 The module path is `github.com/bpradana/goml/tensor`.
-Install it with `go get github.com/bpradana/goml/tensor@v0.1.0`.
+Install it with `go get github.com/bpradana/goml/tensor@v0.2.0`.
 Use the local workspace when developing across modules.
 
 ## First program
@@ -76,8 +76,17 @@ Run the repository example with `mise run example:tensor`.
 | Mathematics | `Exp`, `Log`, `Sqrt` |
 | Reductions | `Sum`, `Mean`, `Max` |
 | Linear algebra | `MatMul` |
+| Joining | `Concat` |
+| Convolution kernels | `Im2Col`, `Col2Im`, `Conv2D` |
+| Parameter update kernels | `SubScaled`, `AdamUpdate` |
 
 Fallible constructors and operations return errors.
+
+The joining, convolution, and parameter-update kernels are included in v0.2.0.
+They allocate immutable results without
+exposing tensor backing arrays. `AdamUpdate` updates only explicitly supplied,
+caller-owned moment buffers. See the [CPU performance report](../docs/performance/cpu.md)
+for measurements and the required tensor-before-nn release order.
 Use constructors rather than the zero Tensor value.
 Random constructors require a caller-owned `*math/rand/v2.Rand`.
 

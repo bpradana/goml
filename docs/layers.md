@@ -2,8 +2,8 @@
 
 [Documentation](README.md) · [nn API](../nn/README.md) · [Examples](../nn/examples/README.md)
 
-This guide describes the spatial, recurrent, attention, and transformer layers in nn v0.3.0.
-They use the existing tensor v0.1.0 API and require no new runtime dependencies.
+This guide describes the spatial, recurrent, attention, and transformer layers in nn v0.4.0.
+They use tensor v0.2.0 for numerical kernels and require no external model runtime.
 
 ## Choose a layer
 
@@ -57,10 +57,13 @@ Patch extraction saves geometry for backward.
 Overlapping patches add their gradient contributions into the original image positions.
 The matrix product and bias use the existing differentiable operations.
 
-The current implementation allocates a full patch matrix.
+Training retains one full patch matrix for weight differentiation. Inference
+uses 64-position patch tiles and writes NCHW output and bias directly. Numerical
+extraction and scattering live in tensor; parameter ownership and graph wiring
+remain in nn/layer.
 Conv2D does not support dilation, groups, or asymmetric padding.
 Use the separate MaxPool2D layer for pooling.
-Large images can require substantial temporary memory.
+Training on large images can still require substantial temporary memory.
 
 ## Pooling and interpolation
 

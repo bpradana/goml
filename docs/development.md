@@ -68,7 +68,7 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
 | `test:standalone` | Tests the three core modules with `GOWORK=off`. Requires published upstream versions. |
-| `test:standalone:yolo` | Tests the independent YOLO module after nn v0.3.0 is published. |
+| `test:standalone:yolo` | Tests the independent YOLO module with published nn v0.4.0 and tensor v0.2.0. |
 | `test:converter` | Checks pinned Python converter formatting, lint, and unit tests. |
 | `build:portable` | Cross-compiles Linux amd64/arm64, with CGo disabled, scalar and SIMD. |
 | `bench:record` | Records hardware metadata and repeated scalar/SIMD measurements. |
@@ -148,7 +148,7 @@ mise run deps:verify
 mise run test:standalone
 ```
 
-Current manifests resolve published upstream v0.1.0 tags.
+Current manifests use simdops v0.1.0, tensor v0.2.0, and nn v0.4.0.
 For a new upstream version, publish that tag before preparing downstream dependencies.
 Go's public proxy can temporarily cache a lookup made before publication.
 Do not add relative replace directives or fabricate checksum files.
@@ -216,5 +216,5 @@ Python is only needed by conversion and reference tools; ordinary Go tests do no
 Run `mise run fmt:converter` and `mise run test:converter` when changing Python tools.
 The converter uses its own uv.lock; update it deliberately with `uv lock --directory contrib/nn/yolo/convert` and review the dependency changes.
 
-Until nn v0.3.0 is published, use go.work for YOLO development.
-The standalone YOLO release gate and downstream tidy require that published version; keep them separate from the core standalone gate during bootstrap.
+Use go.work for cross-module YOLO development. The standalone YOLO release gate
+resolves nn v0.4.0 and tensor v0.2.0 independently of the workspace.

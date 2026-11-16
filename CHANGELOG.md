@@ -1,5 +1,23 @@
 # Changelog
 
+## tensor v0.2.0, nn v0.4.0, and contrib/nn/yolo v0.2.0
+
+Publish `tensor/v0.2.0`, then `nn/v0.4.0`, then `contrib/nn/yolo/v0.2.0`.
+nn requires tensor v0.2.0; YOLO requires nn v0.4.0 and tensor v0.2.0.
+simdops remains at v0.1.0. Generate downstream checksums after each upstream tag
+is available. Workspace validation and measurements are documented in
+[the CPU performance report](docs/performance/cpu.md).
+
+- Blocked Float32 matrix multiplication with small strided execution and selective RHS packing.
+- Single-allocation training patches and bounded tiled Conv2D inference without mutable tensor access.
+- Incremental broadcasting, reductions, and strided copies, plus direct tensor concatenation.
+- Reduced gradient copying and staging allocations, and skipped untracked MatMul derivatives.
+- Fused immutable SGD and Adam parameter results with preserved moment and rounding semantics.
+- Reused Softmax exponentials and omitted unused inference slice metadata.
+- Focused mise benchmarks and source-backed scalar/SIMD recordings for CPU and YOLO workloads.
+- On the measured Apple M1 Pro, 512-square MatMul improved from 183 ms to 32.7 ms;
+  YOLO640 forward improved from 5.98 s to 1.28 s with 82.6% fewer allocated bytes.
+
 ## nn v0.3.0 and contrib/nn/yolo v0.1.0
 
 Tensor and simdops remain at v0.1.0. Release nn/v0.3.0 before contrib/nn/yolo/v0.1.0.

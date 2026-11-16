@@ -2,12 +2,17 @@
 
 [Documentation](README.md) · [Validation](testing.md)
 
+For the current optimization measurements, numerical validation, allocation
+tradeoffs, and reproduction commands, see [CPU performance](performance/cpu.md).
+The measurements below are retained as the original historical baseline.
+
 The tables below record the original numerical and dense-network baseline.
 They predate the additional convolutional, recurrent, and transformer layers.
 Those layers have Forward, Inference, and ForwardBackward benchmarks in nn/layer.
 Run `mise run bench:nn` to measure them on the current machine.
-Conv2D materializes patches, and attention materializes per-head score matrices.
-These initial implementations make no measured speedup claim.
+The original Conv2D implementation materialized full patches, and attention
+materialized per-head score matrices. The historical results below make no
+speedup claim for those layers.
 
 Measured locally on 2026-11-16 using Go 1.27.3, macOS arm64, Apple M1 Pro.
 Source commit: `71293b863b5c5427abffcb7911c7741eea70d956`. Recorded UTC timestamp: `2026-11-15T17:23:03Z`.
@@ -23,7 +28,8 @@ mise run bench:record
 ```
 
 The task writes a UTC timestamp, source commit, hardware metadata, scalar-build results, and SIMD-build results
-to the ignored `benchmark-results/` directory. GitHub's manual benchmark workflow
+to a timestamped directory under ignored `benchmark-results/`. Set
+`GOML_BENCH_DIR` to choose a destination. GitHub's manual benchmark workflow
 uploads those files separately for native amd64 and arm64 runners.
 Run longer samples on an otherwise idle machine before performance decisions.
 
@@ -88,11 +94,12 @@ The 1,024-element sigmoid inference benchmark uses 7 allocations.
 Parent-list allocation occurs only for tracked operations.
 Inference retains no parent lists or backward closures.
 
-Strided and broadcast arithmetic use general logical indexing and are slower
-than contiguous kernels. Matrix multiplication is a numerical baseline with
+The original strided and broadcast arithmetic used general logical indexing.
+The original matrix multiplication was a numerical baseline with
 improved traversal, without blocking, packing, or parallel workers.
 Allocation reuse, specialized strided loops, and blocked multiplication remain
-measurable future opportunities. There are no global pools or worker engines.
+opportunities subsequently evaluated in the current CPU report. There are no
+global pools or worker engines.
 
 The local results do not measure native amd64 performance or actual MNIST
 dataset accuracy. Native CI benchmark runs require pushing the repository first.

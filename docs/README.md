@@ -40,9 +40,8 @@ The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-The release set is simdops v0.1.0, tensor v0.1.0, nn v0.3.0, and contrib/nn/yolo v0.1.0.
-The three core modules resolve published upstream dependencies.
-YOLO standalone checks require publication of nn v0.3.0 and subsequent checksum generation.
+The release set is simdops v0.1.0, tensor v0.2.0, nn v0.4.0, and contrib/nn/yolo v0.2.0.
+nn resolves tensor v0.2.0; YOLO resolves nn v0.4.0 and tensor v0.2.0.
 Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from

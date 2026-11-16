@@ -7,7 +7,7 @@
 **Pretrained YOLOv8n object detection on the CPU, powered by goml.**
 
 ![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8)
-![yolo](https://img.shields.io/badge/yolo-v0.1.0-blue)
+![yolo](https://img.shields.io/badge/yolo-v0.2.0-blue)
 ![Runtime](https://img.shields.io/badge/runtime-pure%20Go-555)
 
 [Quick start](#quick-start) · [Go API](#go-api) · [Conversion](#weight-conversion) · [Validation](#numerical-validation) · [Project](../../../README.md)
@@ -21,9 +21,9 @@ Inference uses goml's float32 tensor and neural network libraries.
 It requires no Python process, CGo, ONNX Runtime, GPU, or external inference service.
 
 The module path is `github.com/bpradana/goml/contrib/nn/yolo`.
-It has its own go.mod and release tag, `contrib/nn/yolo/v0.1.0`.
-It requires nn v0.3.0 and tensor v0.1.0; simdops remains at v0.1.0.
-Publish nn v0.3.0 before resolving this module outside the repository workspace.
+It has its own go.mod and release tag, `contrib/nn/yolo/v0.2.0`.
+It requires nn v0.4.0 and tensor v0.2.0; simdops remains at v0.1.0.
+These versioned dependencies support installation outside the repository workspace.
 
 ## Supported model
 
@@ -66,10 +66,10 @@ Downloaded weights, images, and reference artifacts stay in the ignored data dir
 The verified 320-pixel run on the bus image returns one bus and three people.
 This is a functional example, not an accuracy evaluation.
 
-After the module tags are published, install the Go library independently:
+Install the Go library independently:
 
 ```sh
-go get github.com/bpradana/goml/contrib/nn/yolo@v0.1.0
+go get github.com/bpradana/goml/contrib/nn/yolo@v0.2.0
 ```
 
 ## Go API
@@ -135,7 +135,8 @@ NMS considers at most 30,000 confidence-sorted candidates and suppresses overlap
 
 Model weights remain private and immutable.
 Calls can share a loaded Model while allocating independent activations.
-Execution is currently sequential, and convolution materializes patch matrices.
+Execution is sequential. Convolution inference uses bounded patch tiles and
+writes NCHW output directly; it does not materialize a full patch matrix.
 Large inputs increase latency and temporary memory; this implementation does not promise real-time detection.
 
 ## Weight conversion
@@ -205,7 +206,8 @@ Run `mise run check` for the complete workspace, or the module-specific tasks ab
 The new primitives live in [nn/layer](../../../nn/layer/README.md) and [nn/activation](../../../nn/activation/README.md).
 YOLO-specific C2f, bottleneck, SPPF composition, model conversion, decoding, and NMS stay in this module.
 
-Release dependencies in order: `nn/v0.3.0`, then `contrib/nn/yolo/v0.1.0`.
-After nn is published, run `GOWORK=off mise run deps:tidy:yolo`, commit the generated dependency checksums, and run `mise run test:standalone:yolo` before tagging YOLO.
+Release dependencies in order: `tensor/v0.2.0`, then `nn/v0.4.0`, then `contrib/nn/yolo/v0.2.0`.
+Run `GOWORK=off mise run deps:tidy:yolo` to refresh dependency checksums and
+`mise run test:standalone:yolo` to validate the versioned dependencies.
 The [release workflow](../../../.github/workflows/release.yml) recognizes the nested module tag and generates module-specific release notes.
-Tensor and simdops require no new release.
+simdops remains at v0.1.0 and requires no new release.
