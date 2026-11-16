@@ -7,6 +7,7 @@ on:
       - "tensor/v*"
       - "nn/v*"
       - "contrib/nn/yolo/v*"
+      - "contrib/backend/metal/v*"
   workflow_dispatch:
     inputs:
       tag:
@@ -23,7 +24,7 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ${{ startsWith(inputs.tag || github.ref_name, 'contrib/backend/metal/') && fromJSON('["self-hosted", "macOS", "ARM64", "metal"]') || 'ubuntu-latest' }}
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
       module: ${{ steps.metadata.outputs.module }}
@@ -38,7 +39,7 @@ jobs:
         with:
           script: |
             const tag = process.env.RELEASE_TAG;
-            const match = /^(simdops|tensor|nn|contrib\/nn\/yolo)\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
+            const match = /^(simdops|tensor|nn|contrib\/nn\/yolo|contrib\/backend\/metal)\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
             if (!match || Number(match[2]) > 1) {
               throw new Error('Expected a module tag such as nn/v0.4.0; current module paths support v0 and v1.');
             }
@@ -48,7 +49,8 @@ jobs:
             await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
             core.setOutput('tag', tag);
             core.setOutput('module', match[1]);
-            core.setOutput('target', match[1] === 'contrib/nn/yolo' ? 'yolo' : match[1]);
+            const targets = { 'contrib/nn/yolo': 'yolo', 'contrib/backend/metal': 'gpu:metal' };
+            core.setOutput('target', targets[match[1]] || match[1]);
             core.setOutput('version', tag.slice(tag.lastIndexOf('/') + 1));
       - uses: actions/checkout@v7
         with:

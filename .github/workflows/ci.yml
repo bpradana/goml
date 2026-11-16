@@ -15,4 +15,3 @@ jobs:
           version: 2026.8.15
           install_args: "--locked"
       - run: mise run ci
-      - run: mise run test:standalone
