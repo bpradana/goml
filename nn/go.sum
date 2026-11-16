@@ -1,4 +1,4 @@
 github.com/bpradana/goml/simdops v0.1.0 h1:6gT4CNdwe8d5J6vTj8DMzNhTw7z2hSHKXyNie5k5/CI=
 github.com/bpradana/goml/simdops v0.1.0/go.mod h1:T1Oe8XNwcKOWs1CJe/AUu4nqt+MoukE13BPJyJGy7PA=
-github.com/bpradana/goml/tensor v0.1.0 h1:T5t3S/LEdEKzDD0zO39lILXStprXu1mA5+hOekSUAFg=
-github.com/bpradana/goml/tensor v0.1.0/go.mod h1:mQtjruLHQrdRMJpJgpC0lMvlPk7DL1VTR9Xr1mhgMWo=
+github.com/bpradana/goml/tensor v0.2.0 h1:18ilk+jdxx3hlvkcFt7y1mLkRBj+mzKDrmA+IQXFX8Y=
+github.com/bpradana/goml/tensor v0.2.0/go.mod h1:mQtjruLHQrdRMJpJgpC0lMvlPk7DL1VTR9Xr1mhgMWo=
