@@ -34,7 +34,7 @@ func recurrentState(input, state *nn.Value, batch, hidden int) (*nn.Value, error
 		return state, nil
 	}
 
-	data, err := tensor.Zeros(batch, hidden)
+	data, err := tensor.FullLike(input.Data(), 0, batch, hidden)
 	if err != nil {
 		return nil, err
 	}

@@ -70,3 +70,12 @@ mise run example:xor
 ```
 
 Tests check values, finite-difference gradients, broadcasting restrictions, invalid labels, and shape failures.
+
+## GPU execution
+
+MSE and cross-entropy operate through device-aware tensors and return device-resident scalar losses.
+Cross-entropy uses shifted exponentials and combines the target offset before adding log-sum-exp.
+This preserves small losses when logits share a large common offset.
+Finite-logit validation downloads one four-byte status flag and synchronizes without downloading the logits array.
+Host class labels are explicitly uploaded as constants. Gradients remain on the prediction device.
+See [GPU training](../../docs/gpu.md#neural-networks-and-gradients).

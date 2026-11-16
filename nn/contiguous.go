@@ -9,7 +9,12 @@ func Contiguous(input *Value) (*Value, error) {
 		return nil, err
 	}
 
-	return NewOperation(input.data.Contiguous(), input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
+	data, err := input.data.MakeContiguous()
+	if err != nil {
+		return nil, err
+	}
+
+	return NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
 		return g, nil
 	})
 }

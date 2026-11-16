@@ -24,6 +24,10 @@ func (*Sigmoid) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: sigmoid: nil or uninitialized value")
 	}
 
+	if !input.Data().IsCPU() {
+		return deviceActivation(input, "sigmoid")
+	}
+
 	source := input.Data()
 	shape := source.Shape()
 	values := source.Data()

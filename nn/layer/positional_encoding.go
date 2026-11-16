@@ -47,7 +47,7 @@ func (*PositionalEncoding) Forward(input *nn.Value) (*nn.Value, error) {
 		}
 	}
 
-	encoding, err = tensor.From(values, shape[1], shape[2])
+	encoding, err = tensor.FromLike(input.Data(), values, shape[1], shape[2])
 	if err != nil {
 		return nil, err
 	}

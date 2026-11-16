@@ -9,9 +9,11 @@ import (
 )
 
 type adamState struct {
-	first  []float32
-	second []float32
-	steps  uint64
+	gpuFirst  *tensor.Tensor
+	gpuSecond *tensor.Tensor
+	first     []float32
+	second    []float32
+	steps     uint64
 }
 
 // Adam owns first and second moment estimates for its parameters.
@@ -55,6 +57,10 @@ func NewAdam(parameters []*nn.Parameter, learningRate, beta1, beta2, epsilon flo
 func (a *Adam) Step() error {
 	if a.state == nil {
 		return fmt.Errorf("nn: adam: use NewAdam to initialize the optimizer")
+	}
+
+	if len(a.parameters) > 0 && a.parameters[0].Value().Data().Device() != nil {
+		return a.deviceStep()
 	}
 
 	for _, parameter := range a.parameters {

@@ -34,6 +34,10 @@ func (s *Softmax) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: softmax: axis %d must select a nonempty dimension in %v", s.axis, shape)
 	}
 
+	if !input.Data().IsCPU() {
+		return deviceSoftmax(input, s.axis)
+	}
+
 	values := input.Data().Data()
 	probabilities := make([]float32, len(values))
 

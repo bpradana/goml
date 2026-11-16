@@ -75,3 +75,12 @@ mise run example:xor
 
 Tests compare SGD and bias-corrected Adam updates with independent calculations and check shared parameter handling.
 Momentum, schedules, clipping, and optimizer-state serialization are outside the current API.
+
+## GPU parameters
+
+Call nn.ToDevice before constructing the optimizer. Parameters and gradients must share one device.
+GPU SGD stages immutable results, synchronizes once, then commits the parameter set.
+Adam keeps its moment tensors on the GPU and stages their replacement with parameter updates.
+Call Adam.Close to release those moments. Close does not close model parameters.
+ZeroGrad releases GPU leaf-gradient leases. Retain an independent view before clearing a borrowed Grad handle.
+See [GPU training and ownership](../../docs/gpu.md#neural-networks-and-gradients).

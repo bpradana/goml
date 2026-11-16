@@ -19,7 +19,12 @@ func Reshape(a *Value, shape ...int) (*Value, error) {
 		original := a.data.Shape()
 		out.backward = func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
 			if !g.IsContiguous() {
-				g = g.Contiguous()
+				var err error
+
+				g, err = g.MakeContiguous()
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			grad, err := g.Reshape(original...)

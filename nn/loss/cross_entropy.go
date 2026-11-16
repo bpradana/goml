@@ -34,6 +34,10 @@ func (*CrossEntropy) Forward(prediction *nn.Value, target []int) (*nn.Value, err
 		return nil, fmt.Errorf("nn/loss: cross-entropy: expected nonempty [batch,classes] logits and batch targets, got %v and %d targets", shape, len(target))
 	}
 
+	if !data.IsCPU() {
+		return deviceCrossEntropy(prediction, target)
+	}
+
 	input := data.Data()
 	rows, columns := shape[0], shape[1]
 

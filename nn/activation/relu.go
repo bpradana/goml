@@ -24,6 +24,10 @@ func (*ReLU) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: relu: nil or uninitialized value")
 	}
 
+	if !input.Data().IsCPU() {
+		return deviceActivation(input, "relu")
+	}
+
 	source := input.Data()
 	shape := source.Shape()
 	values := source.Data()

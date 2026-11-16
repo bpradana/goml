@@ -24,6 +24,10 @@ func (*SiLU) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: silu: nil or uninitialized value")
 	}
 
+	if !input.Data().IsCPU() {
+		return deviceActivation(input, "silu")
+	}
+
 	shape := input.Data().Shape()
 	values := input.Data().Data()
 

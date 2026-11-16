@@ -61,6 +61,10 @@ func (l *LayerNorm) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn: layer norm: expected final dimension %d, got %v", l.features, shape)
 	}
 
+	if !input.Data().IsCPU() {
+		return l.deviceForward(input)
+	}
+
 	values := input.Data().Data()
 	scales := l.scale.Value().Data().Data()
 	biases := l.bias.Value().Data().Data()

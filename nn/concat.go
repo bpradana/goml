@@ -41,7 +41,11 @@ func Concat(axis int, inputs ...*Value) (*Value, error) {
 				return nil, err
 			}
 
-			grads[i] = part.Contiguous()
+			grads[i], err = part.MakeContiguous()
+			if err != nil {
+				return nil, err
+			}
+
 			start += current[axis]
 		}
 

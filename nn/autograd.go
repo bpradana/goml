@@ -20,7 +20,12 @@ func (v *Value) Backward() error {
 		return fmt.Errorf("nn: backward: expected scalar, got shape %v", v.data.Shape())
 	}
 
-	return v.BackwardWith(tensor.Scalar(1))
+	seed, err := tensor.FullLike(v.data, 1)
+	if err != nil {
+		return err
+	}
+
+	return v.BackwardWith(seed)
 }
 
 // BackwardWith computes a vector-Jacobian product with an explicit seed.
@@ -35,7 +40,11 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 		return fmt.Errorf("nn: backward: value does not track gradients")
 	}
 
-	if seed == nil || !slices.Equal(seed.Shape(), v.data.Shape()) || seed.Numel() != v.data.Numel() {
+	if seed != nil && !sameDevice(seed, v.data) {
+		return fmt.Errorf("nn: backward: seed device must match output")
+	}
+
+	if seed == nil || seed.IsClosed() || !slices.Equal(seed.Shape(), v.data.Shape()) || seed.Numel() != v.data.Numel() {
 		return fmt.Errorf("nn: backward: seed must match output shape %v", v.data.Shape())
 	}
 
@@ -122,8 +131,43 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 		adjoints[node] = g
 	}
 
+	if device := v.data.Device(); device != nil {
+		if err := device.Synchronize(); err != nil {
+			return err
+		}
+	}
+
+	// Leaves outlive individual forward scopes. Give them independent leases
+	// so parameter gradients can accumulate across batches until ZeroGrad.
+	owned := make(map[*Value]*tensor.Tensor)
+
+	committed := false
+	defer func() {
+		if !committed {
+			for _, gradient := range owned {
+				_ = gradient.Close()
+			}
+		}
+	}()
+
 	for _, node := range order {
-		node.grad = adjoints[node]
+		if len(node.parents) == 0 && node.data.Device() != nil {
+			gradient, err := adjoints[node].To(node.data.Device())
+			if err != nil {
+				return err
+			}
+
+			owned[node] = gradient
+		}
+	}
+
+	for _, node := range order {
+		if gradient := owned[node]; gradient != nil {
+			node.ZeroGrad()
+			node.grad, node.ownsGrad = gradient, true
+		} else {
+			node.grad = adjoints[node]
+		}
 
 		if node.backward != nil {
 			node.parents = nil
@@ -131,6 +175,8 @@ func (v *Value) BackwardWith(seed *tensor.Tensor) error {
 			node.consumed = true
 		}
 	}
+
+	committed = true
 
 	return nil
 }
@@ -158,7 +204,12 @@ func reduceGradient(g *tensor.Tensor, shape []int) (*tensor.Tensor, error) {
 	}
 
 	if !g.IsContiguous() {
-		g = g.Contiguous()
+		var err error
+
+		g, err = g.MakeContiguous()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return g.Reshape(shape...)

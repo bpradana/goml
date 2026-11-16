@@ -16,6 +16,15 @@ type Parameter struct {
 // NewParameter wraps immutable data in a trainable leaf.
 // Nil or uninitialized tensors return an error.
 func NewParameter(data *tensor.Tensor) (*Parameter, error) {
+	if data != nil && data.Device() != nil {
+		owned, err := data.To(data.Device())
+		if err != nil {
+			return nil, err
+		}
+
+		data = owned
+	}
+
 	v, err := NewValue(data, true)
 	if err != nil {
 		return nil, err
@@ -37,17 +46,34 @@ func (p *Parameter) ZeroGrad() {
 // Update replaces the immutable tensor data while preserving the parameter's
 // identity and accumulated gradient. The new shape must match the old shape.
 // Optimizers use this boundary; callers must synchronize updates with training.
+// GPU parameters own a lease separate from the supplied tensor. Replacement
+// releases the old borrowed handle; independent GPU views retain their values.
 func (p *Parameter) Update(data *tensor.Tensor) error {
 	if p == nil || p.value == nil {
 		return fmt.Errorf("nn: parameter: uninitialized parameter")
 	}
 
-	if data == nil || !slices.Equal(data.Shape(), p.value.data.Shape()) ||
+	if data == nil || data.IsClosed() || !slices.Equal(data.Shape(), p.value.data.Shape()) ||
 		data.Numel() != p.value.data.Numel() {
 		return fmt.Errorf("nn: parameter: update must preserve shape %v", p.value.data.Shape())
 	}
 
-	p.value.data = data
+	if !sameDevice(data, p.value.data) {
+		return fmt.Errorf("nn: parameter: update must preserve device; use nn.ToDevice")
+	}
+
+	if data.Device() != nil {
+		owned, err := data.To(data.Device())
+		if err != nil {
+			return err
+		}
+
+		previous := p.value.data
+		p.value.data = owned
+		_ = previous.Close()
+	} else {
+		p.value.data = data
+	}
 
 	return nil
 }

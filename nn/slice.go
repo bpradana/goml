@@ -22,6 +22,10 @@ func Slice(input *Value, axis, start, end int) (*Value, error) {
 	size := input.data.Numel()
 
 	return NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
+		if !g.IsCPU() {
+			return tensor.ScatterSlice(g, shape, axis, start)
+		}
+
 		gradient := make([]float32, size)
 
 		if g.Numel() != 0 {

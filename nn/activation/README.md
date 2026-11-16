@@ -58,3 +58,10 @@ mise run lint:nn
 ```
 
 Tests cover finite-difference gradients, extreme values, invalid inputs, and inference behavior.
+
+## GPU execution
+
+ReLU, Sigmoid, Tanh, SiLU, and Softmax preserve the tensor device in forward and backward operations.
+GPU intermediates remain resident and follow the input's temporary scope.
+Float32 rounding can differ from CPU implementations that use wider intermediate arithmetic.
+See [GPU scope ownership](../../docs/gpu.md#explicit-lifetimes) and the [Metal parity report](../../docs/performance/metal.md).

@@ -142,3 +142,12 @@ This is a weight warm start, not an exact continuation of Adam's previous moment
 `layer.Restore` rebuilds that description with an ordered parameter list and references those parameters directly.
 The checkpoint package combines these operations with tensor encoding, validation, and file handling.
 Use checkpoint.Save and Load for a complete persistent network.
+
+## GPU parameters
+
+Save, SaveWeights, and Marshal explicitly download GPU parameter values through fallible HostData.
+Native handles and device objects never enter the file format. Complete Load and Unmarshal restore CPU models.
+LoadWeights preserves existing parameter devices by staging uploads before synchronization and commit.
+Success preserves shared parameter identity and clears gradients. Errors preserve the original model state.
+Loading on CPU requires no Metal backend, CGo, or Apple framework.
+See [GPU checkpoint compatibility](../../docs/gpu.md#checkpoints-and-yolo).

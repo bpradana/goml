@@ -134,6 +134,7 @@ func MatMul(a, b *Value) (*Value, error) {
 			if err != nil {
 				return nil, err
 			}
+			defer func() { _ = bt.Close() }()
 
 			ga, err = tensor.MatMul(g, bt)
 			if err != nil {
@@ -146,6 +147,7 @@ func MatMul(a, b *Value) (*Value, error) {
 			if err != nil {
 				return nil, err
 			}
+			defer func() { _ = at.Close() }()
 
 			gb, err = tensor.MatMul(at, g)
 			if err != nil {

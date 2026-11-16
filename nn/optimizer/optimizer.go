@@ -31,6 +31,17 @@ func optimizerParameters(parameters []*nn.Parameter, learningRate float32) ([]*n
 			return nil, fmt.Errorf("nn: optimizer: nil or uninitialized parameter at index %d", i)
 		}
 
+		if parameter.Value().Data().IsClosed() {
+			return nil, fmt.Errorf("nn: optimizer: parameter %d has closed device storage", i)
+		}
+
+		if len(unique) > 0 {
+			first, current := unique[0].Value().Data().Device(), parameter.Value().Data().Device()
+			if (first == nil) != (current == nil) || (first != nil && first.ID() != current.ID()) {
+				return nil, fmt.Errorf("nn: optimizer: parameters must use one device")
+			}
+		}
+
 		if !seen[parameter] {
 			seen[parameter] = true
 			unique = append(unique, parameter)

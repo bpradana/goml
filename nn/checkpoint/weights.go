@@ -63,6 +63,40 @@ func LoadWeights(path string, parameters []*nn.Parameter) error {
 		}
 	}
 
+	prepared := make([]*tensor.Tensor, len(values))
+
+	defer func() {
+		for _, value := range prepared {
+			_ = value.Close()
+		}
+	}()
+
+	devices := make(map[string]tensor.Device)
+
+	for i, value := range values {
+		device := parameters[i].Value().Data().Device()
+
+		if device == nil {
+			prepared[i] = value
+			continue
+		}
+
+		prepared[i], err = value.To(device)
+		if err != nil {
+			return err
+		}
+
+		devices[device.ID()] = device
+	}
+
+	for _, device := range devices {
+		if err := device.Synchronize(); err != nil {
+			return err
+		}
+	}
+
+	values = prepared
+
 	for i, parameter := range parameters {
 		if err := parameter.Update(values[i]); err != nil {
 			return fmt.Errorf("checkpoint: update parameter %d: %w", i, err)
@@ -77,7 +111,7 @@ func LoadWeights(path string, parameters []*nn.Parameter) error {
 func validateParameters(parameters []*nn.Parameter) error {
 	seen := make(map[*nn.Parameter]bool, len(parameters))
 	for i, parameter := range parameters {
-		if parameter == nil || parameter.Value() == nil || parameter.Value().Data() == nil || seen[parameter] {
+		if parameter == nil || parameter.Value() == nil || parameter.Value().Data() == nil || parameter.Value().Data().IsClosed() || seen[parameter] {
 			return fmt.Errorf("checkpoint: parameter %d is nil, uninitialized, or repeated", i)
 		}
 
@@ -102,7 +136,11 @@ func encodeParameters(parameters []*nn.Parameter) ([]storedTensor, error) {
 		}
 
 		total += data.Numel() * 4
-		values := data.Data()
+
+		values, err := data.HostData()
+		if err != nil {
+			return nil, fmt.Errorf("checkpoint: parameter transfer: %w", err)
+		}
 
 		encoded := make([]byte, len(values)*4)
 		for j, value := range values {

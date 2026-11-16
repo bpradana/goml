@@ -4,7 +4,7 @@
 
 Package layer provides concrete trainable layers, spatial transformations, and Sequential composition.
 It belongs to the nn module; it has no separate go.mod or release tag.
-All computation uses float32 CPU tensors and supports eager differentiation.
+Computation uses Float32 tensors on CPU or an explicitly selected backend and supports eager differentiation.
 
 ## Choose a layer
 

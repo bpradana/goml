@@ -11,6 +11,7 @@ import (
 type Value struct {
 	data      *tensor.Tensor
 	grad      *tensor.Tensor
+	ownsGrad  bool
 	requires  bool
 	inference bool
 	consumed  bool
@@ -21,7 +22,7 @@ type Value struct {
 // NewValue wraps immutable data without copying it. requiresGrad controls
 // tracking for this leaf. Nil and uninitialized tensors return an error.
 func NewValue(data *tensor.Tensor, requiresGrad bool) (*Value, error) {
-	if data == nil || (data.Rank() == 0 && data.Numel() != 1) {
+	if data == nil || data.IsClosed() || (data.Rank() == 0 && data.Numel() != 1) {
 		return nil, fmt.Errorf("nn: value: nil or uninitialized tensor")
 	}
 
@@ -42,7 +43,9 @@ func Inference(data *tensor.Tensor) (*Value, error) {
 	return v, nil
 }
 
-// Data returns the immutable tensor owned by this value.
+// Data returns the immutable tensor owned by this value. A GPU parameter's
+// handle is borrowed until its next update. Create a view or call To with the
+// same device to retain an independent lease across parameter updates.
 func (v *Value) Data() *tensor.Tensor {
 	return v.data
 }
@@ -63,9 +66,15 @@ func (v *Value) IsInference() bool {
 	return v.inference
 }
 
-// ZeroGrad clears this value's accumulated gradient.
+// ZeroGrad clears this value's accumulated gradient. GPU leaf gradients own
+// independent leases, which are released here; retain a view before clearing.
 func (v *Value) ZeroGrad() {
+	if v.ownsGrad {
+		_ = v.grad.Close()
+	}
+
 	v.grad = nil
+	v.ownsGrad = false
 }
 
 // Detach shares immutable data in a new constant leaf with no graph references.
@@ -76,7 +85,7 @@ func (v *Value) Detach() *Value {
 
 func checkValues(op string, values ...*Value) error {
 	for _, v := range values {
-		if v == nil || v.data == nil {
+		if v == nil || v.data == nil || v.data.IsClosed() {
 			return fmt.Errorf("nn: %s: nil or uninitialized value", op)
 		}
 

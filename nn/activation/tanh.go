@@ -24,6 +24,10 @@ func (*Tanh) Forward(input *nn.Value) (*nn.Value, error) {
 		return nil, fmt.Errorf("nn/activation: tanh: nil or uninitialized value")
 	}
 
+	if !input.Data().IsCPU() {
+		return deviceActivation(input, "tanh")
+	}
+
 	source := input.Data()
 	shape := source.Shape()
 	values := source.Data()

@@ -27,8 +27,12 @@ func NewOperation(
 		return nil, err
 	}
 
-	if data == nil || (data.Rank() == 0 && data.Numel() != 1) {
+	if data == nil || data.IsClosed() || (data.Rank() == 0 && data.Numel() != 1) {
 		return nil, fmt.Errorf("nn: operation: nil or uninitialized result tensor")
+	}
+
+	if !sameDevice(data, input.data) {
+		return nil, fmt.Errorf("nn: operation: result device must match input")
 	}
 
 	out := record(data, input)
@@ -48,7 +52,11 @@ func NewOperation(
 			return nil, fmt.Errorf("nn: operation: backward: %w", err)
 		}
 
-		if gradient == nil || gradient.Numel() != size || !slices.Equal(gradient.Shape(), shape) {
+		if gradient != nil && !sameDevice(gradient, input.data) {
+			return nil, fmt.Errorf("nn: operation: gradient device must match input")
+		}
+
+		if gradient == nil || gradient.IsClosed() || gradient.Numel() != size || !slices.Equal(gradient.Shape(), shape) {
 			return nil, fmt.Errorf("nn: operation: backward gradient must match input shape %v", shape)
 		}
 

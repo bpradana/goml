@@ -68,7 +68,12 @@ func reduce(a *Value, mean bool, axes []int) (*Value, error) {
 
 	out.backward = func(g *tensor.Tensor) ([]*tensor.Tensor, error) {
 		if !g.IsContiguous() {
-			g = g.Contiguous()
+			var err error
+
+			g, err = g.MakeContiguous()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		grad, err := g.Reshape(keep...)
@@ -76,7 +81,7 @@ func reduce(a *Value, mean bool, axes []int) (*Value, error) {
 			return nil, err
 		}
 
-		ones, err := tensor.Ones(shape...)
+		ones, err := tensor.FullLike(g, 1, shape...)
 		if err != nil {
 			return nil, err
 		}

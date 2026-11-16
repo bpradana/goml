@@ -197,6 +197,17 @@ func projectSequence(input *nn.Value, projection *Dense) (*nn.Value, error) {
 }
 
 func maskFuture(input *nn.Value) (*nn.Value, error) {
+	if !input.Data().IsCPU() {
+		data, err := tensor.MaskUpperTriangle(input.Data(), float32(math.Inf(-1)))
+		if err != nil {
+			return nil, err
+		}
+
+		return nn.NewOperation(data, input, func(g *tensor.Tensor) (*tensor.Tensor, error) {
+			return tensor.MaskUpperTriangle(g, 0)
+		})
+	}
+
 	shape := input.Data().Shape()
 	values := input.Data().Data()
 
