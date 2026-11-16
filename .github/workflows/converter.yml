@@ -1,0 +1,31 @@
+name: YOLO converter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contrib/nn/yolo/convert/**"
+      - ".mise.toml"
+      - "mise.lock"
+      - ".github/workflows/converter.yml"
+  pull_request:
+    paths:
+      - "contrib/nn/yolo/convert/**"
+      - ".mise.toml"
+      - "mise.lock"
+      - ".github/workflows/converter.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  converter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          version: 2026.8.15
+          install_args: "--locked"
+      - run: mise run test:converter

@@ -3,6 +3,7 @@ lockfile = true
 
 [tools]
 go = "1.27.3"
+uv = "0.9.1"
 "golangci-lint" = "2.15.0"
 "go:golang.org/x/tools/cmd/goimports" = "latest"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
@@ -14,7 +15,8 @@ description = "build all modules"
 run = [
   { task = "build:simdops" },
   { task = "build:tensor" },
-  { task = "build:nn" }
+  { task = "build:nn" },
+  { task = "build:yolo" }
 ]
 
 [tasks."build:simdops"]
@@ -35,10 +37,10 @@ run = "go build ./..."
 [tasks."build:portable"]
 description = "Cross-compile Linux amd64 and arm64 without CGo, with and without SIMD"
 run = [
-  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./simdops/... ./tensor/... ./nn/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./simdops/... ./tensor/... ./nn/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/..."
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/..."
 ]
 
 [tasks."test"]
@@ -46,7 +48,8 @@ description = "test all modules"
 run = [
   { task = "test:simdops" },
   { task = "test:tensor" },
-  { task = "test:nn" }
+  { task = "test:nn" },
+  { task = "test:yolo" }
 ]
 
 [tasks."test:simdops"]
@@ -69,7 +72,8 @@ description = "lint all modules"
 run = [
   { task = "lint:simdops" },
   { task = "lint:tensor" },
-  { task = "lint:nn" }
+  { task = "lint:nn" },
+  { task = "lint:yolo" }
 ]
 
 [tasks."lint:simdops"]
@@ -92,7 +96,8 @@ description = "bench all modules"
 run = [
   { task = "bench:simdops" },
   { task = "bench:tensor" },
-  { task = "bench:nn" }
+  { task = "bench:nn" },
+  { task = "bench:yolo" }
 ]
 
 [tasks."bench:simdops"]
@@ -115,7 +120,8 @@ description = "Format Go sources"
 run = [
   { task = "fmt:simdops" },
   { task = "fmt:tensor" },
-  { task = "fmt:nn" }
+  { task = "fmt:nn" },
+  { task = "fmt:yolo" }
 ]
 
 [tasks."fmt:simdops"]
@@ -135,14 +141,15 @@ run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix 
 
 [tasks."fmt:check"]
 description = "Check Go formatting"
-run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
+run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
 
 [tasks."test:race"]
 description = "Run race detector"
 run = [
   "go test -race ./simdops/...",
   "go test -race ./tensor/...",
-  "go test -race ./nn/..."
+  "go test -race ./nn/...",
+  "go test -race ./contrib/nn/yolo/..."
 ]
 
 [tasks."test:coverage"]
@@ -150,7 +157,8 @@ description = "Report test coverage"
 run = [
   "go test -cover ./simdops/...",
   "go test -cover ./tensor/...",
-  "go test -cover ./nn/..."
+  "go test -cover ./nn/...",
+  "go test -cover ./contrib/nn/yolo/..."
 ]
 
 [tasks."test:simd"]
@@ -159,7 +167,8 @@ env = { GOEXPERIMENT = "simd" }
 run = [
   "go test ./simdops/...",
   "go test ./tensor/...",
-  "go test ./nn/..."
+  "go test ./nn/...",
+  "go test ./contrib/nn/yolo/..."
 ]
 
 [tasks."vet"]
@@ -167,7 +176,8 @@ description = "Run go vet"
 run = [
   "go vet ./simdops/...",
   "go vet ./tensor/...",
-  "go vet ./nn/..."
+  "go vet ./nn/...",
+  "go vet ./contrib/nn/yolo/..."
 ]
 
 [tasks."security:vuln"]
@@ -175,7 +185,8 @@ description = "Run vulnerability analysis"
 run = [
   "cd simdops && govulncheck ./...",
   "cd tensor && govulncheck ./...",
-  "cd nn && govulncheck ./..."
+  "cd nn && govulncheck ./...",
+  "cd contrib/nn/yolo && govulncheck ./..."
 ]
 
 [tasks."test:standalone"]
@@ -194,7 +205,8 @@ run = [
   "go test -run '^$' -fuzz '^FuzzBroadcast$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
   "go test -run '^$' -fuzz '^FuzzViews$' -fuzztime=3s -parallel=2 ./tensor",
   "go test -run '^$' -fuzz '^FuzzUnmarshal$' -fuzztime=3s -parallel=2 ./nn/checkpoint",
-  "go test -run '^$' -fuzz '^FuzzRestore$' -fuzztime=3s -parallel=2 ./nn/layer"
+  "go test -run '^$' -fuzz '^FuzzRestore$' -fuzztime=3s -parallel=2 ./nn/layer",
+  "go test -run '^$' -fuzz '^FuzzLoadArchive$' -fuzztime=3s -parallel=2 ./contrib/nn/yolo"
 ]
 
 [tasks."example:tensor"]
@@ -246,8 +258,8 @@ run = [
   "go env GOOS GOARCH GOAMD64 GOARM64 >> benchmark-results/hardware.txt",
   "uname -a >> benchmark-results/hardware.txt",
   "if command -v lscpu >/dev/null 2>&1; then lscpu >> benchmark-results/hardware.txt; else sysctl -n machdep.cpu.brand_string >> benchmark-results/hardware.txt; fi",
-  "go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... > benchmark-results/scalar.txt",
-  "GOEXPERIMENT=simd go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... > benchmark-results/simd.txt"
+  "go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > benchmark-results/scalar.txt",
+  "GOEXPERIMENT=simd go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > benchmark-results/simd.txt"
 ]
 
 [tasks."deps:tidy"]
@@ -255,7 +267,8 @@ description = "Tidy module dependencies"
 run = [
   { task = "deps:tidy:simdops" },
   { task = "deps:tidy:tensor" },
-  { task = "deps:tidy:nn" }
+  { task = "deps:tidy:nn" },
+  { task = "deps:tidy:yolo" }
 ]
 
 [tasks."deps:tidy:simdops"]
@@ -283,7 +296,8 @@ run = [
   "go doc github.com/bpradana/goml/nn/checkpoint",
   "go doc github.com/bpradana/goml/nn/layer",
   "go doc github.com/bpradana/goml/nn/loss",
-  "go doc github.com/bpradana/goml/nn/optimizer"
+  "go doc github.com/bpradana/goml/nn/optimizer",
+  "go doc github.com/bpradana/goml/contrib/nn/yolo"
 ]
 
 [tasks."deps:sync"]
@@ -295,7 +309,8 @@ description = "Verify dependency checksums"
 run = [
   "cd simdops && go mod verify",
   "cd tensor && go mod verify",
-  "cd nn && go mod verify"
+  "cd nn && go mod verify",
+  "cd contrib/nn/yolo && go mod verify"
 ]
 
 [tasks."security:nancy"]
@@ -303,7 +318,8 @@ description = "Scan dependencies with Sonatype Nancy"
 run = [
   "cd simdops && go list -json -deps ./... | nancy sleuth",
   "cd tensor && go list -json -deps ./... | nancy sleuth",
-  "cd nn && go list -json -deps ./... | nancy sleuth"
+  "cd nn && go list -json -deps ./... | nancy sleuth",
+  "cd contrib/nn/yolo && go list -json -deps ./... | nancy sleuth"
 ]
 
 [tasks."check"]
@@ -323,3 +339,71 @@ run = [
   { task = "test:race" },
   { task = "security:vuln" }
 ]
+
+[tasks."build:yolo"]
+description = "Build the independent YOLO module"
+dir = "contrib/nn/yolo"
+run = "go build ./..."
+
+[tasks."test:yolo"]
+description = "Test YOLO inference and archive validation"
+dir = "contrib/nn/yolo"
+run = "go test ./..."
+
+[tasks."lint:yolo"]
+description = "Lint the YOLO module"
+dir = "contrib/nn/yolo"
+run = "golangci-lint run ./..."
+
+[tasks."fmt:yolo"]
+description = "Format YOLO sources and fix whitespace"
+dir = "contrib/nn/yolo"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."bench:yolo"]
+description = "Benchmark YOLO preprocessing and postprocessing"
+dir = "contrib/nn/yolo"
+run = "go test -run '^$' -bench=. -benchmem ./..."
+
+[tasks."deps:tidy:yolo"]
+description = "Tidy YOLO dependencies after nn v0.3.0 is published"
+dir = "contrib/nn/yolo"
+run = "go mod tidy"
+
+[tasks."test:standalone:yolo"]
+description = "Verify YOLO's published dependencies after nn v0.3.0 is released"
+dir = "contrib/nn/yolo"
+env = { GOWORK = "off" }
+run = "go test ./..."
+
+[tasks."convert:yolo"]
+description = "Convert a trusted YOLOv8n PyTorch checkpoint (pass source and destination)"
+run = "uv run --project contrib/nn/yolo/convert --locked python contrib/nn/yolo/convert/convert.py"
+
+[tasks."example:yolo"]
+description = "Detect objects with the converted YOLOv8n model (pass -model and -image)"
+run = "go run ./contrib/nn/yolo/cmd/yolo"
+
+[tasks."test:converter"]
+description = "Check the locked offline YOLO converter"
+run = [
+  "uv run --project contrib/nn/yolo/convert --locked ruff check contrib/nn/yolo/convert",
+  "uv run --project contrib/nn/yolo/convert --locked ruff format --check contrib/nn/yolo/convert",
+  "uv run --project contrib/nn/yolo/convert --locked python -m unittest discover -s contrib/nn/yolo/convert -p '*_test.py'"
+]
+
+[tasks."test:yolo:reference"]
+description = "Validate local pretrained weights using GOML_YOLO_MODEL and optional image/reference paths"
+run = "go test -run '^TestModel_PretrainedReference$' -count=1 -v ./contrib/nn/yolo"
+
+[tasks."reference:yolo"]
+description = "Produce PyTorch references from Go's input.f32 (pass checkpoint and reference directory)"
+run = "uv run --project contrib/nn/yolo/convert --locked python contrib/nn/yolo/convert/reference.py"
+
+[tasks."fmt:converter"]
+description = "Format the offline YOLO converter"
+run = "uv run --project contrib/nn/yolo/convert --locked ruff format contrib/nn/yolo/convert"
+
+[tasks."lint:actions"]
+description = "Validate GitHub Actions workflows with pinned actionlint"
+run = "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12"

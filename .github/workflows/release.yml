@@ -6,10 +6,11 @@ on:
       - "simdops/v*"
       - "tensor/v*"
       - "nn/v*"
+      - "contrib/nn/yolo/v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing module tag, for example nn/v0.1.0"
+        description: "Existing module tag, for example contrib/nn/yolo/v0.1.0"
         required: true
         type: string
 
@@ -26,6 +27,7 @@ jobs:
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
       module: ${{ steps.metadata.outputs.module }}
+      target: ${{ steps.metadata.outputs.target }}
       version: ${{ steps.metadata.outputs.version }}
     steps:
       - name: Validate module tag
@@ -36,7 +38,7 @@ jobs:
         with:
           script: |
             const tag = process.env.RELEASE_TAG;
-            const match = /^(simdops|tensor|nn)\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
+            const match = /^(simdops|tensor|nn|contrib\/nn\/yolo)\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
             if (!match || Number(match[2]) > 1) {
               throw new Error('Expected a module tag such as nn/v0.1.0; current module paths support v0 and v1.');
             }
@@ -46,7 +48,8 @@ jobs:
             await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
             core.setOutput('tag', tag);
             core.setOutput('module', match[1]);
-            core.setOutput('version', tag.slice(tag.indexOf('/') + 1));
+            core.setOutput('target', match[1] === 'contrib/nn/yolo' ? 'yolo' : match[1]);
+            core.setOutput('version', tag.slice(tag.lastIndexOf('/') + 1));
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.metadata.outputs.tag }}
@@ -58,12 +61,12 @@ jobs:
       - name: Test the tagged module independently
         env:
           GOWORK: "off"
-          MODULE: ${{ steps.metadata.outputs.module }}
+          MODULE: ${{ steps.metadata.outputs.target }}
         run: mise run "test:${MODULE}"
       - name: Lint the tagged module independently
         env:
           GOWORK: "off"
-          MODULE: ${{ steps.metadata.outputs.module }}
+          MODULE: ${{ steps.metadata.outputs.target }}
         run: mise run "lint:${MODULE}"
 
   publish:
