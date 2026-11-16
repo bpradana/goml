@@ -115,6 +115,33 @@ description = "bench nn"
 dir = "nn"
 run = "go test -run '^$' -bench=. -benchmem ./..."
 
+[tasks."bench:matmul"]
+description = "Benchmark square, rectangular, small, and strided matrix products"
+run = "go test -run '^$' -bench=MatMul -benchmem ./tensor"
+
+[tasks."bench:conv2d"]
+description = "Benchmark Conv2D inference and backward at CNN and YOLO sizes"
+run = [
+  "go test -run '^$' -bench=ConvolutionStrategies -benchmem ./tensor",
+  "go test -run '^$' -bench=BenchmarkConv2D -benchmem ./nn/layer"
+]
+
+[tasks."bench:autograd"]
+description = "Benchmark eager forward and backward"
+run = "go test -run '^$' -bench=ForwardBackward -benchmem ./nn"
+
+[tasks."bench:optimizer"]
+description = "Benchmark SGD and Adam steps separately from training"
+run = "go test -run '^$' -bench=OptimizerStep -benchmem ./nn/optimizer"
+
+[tasks."bench:attention"]
+description = "Benchmark Transformer inference and training"
+run = "go test -run '^$' -bench=AdvancedLayers/TransformerEncoder -benchmem ./nn/layer"
+
+[tasks."bench:inference"]
+description = "Benchmark Dense, CNN, recurrent, and Transformer inference"
+run = "go test -run '^$' -bench='Sequential/Inference|AdvancedLayers/.*/Inference' -benchmem ./nn/layer"
+
 [tasks."fmt"]
 description = "Format Go sources"
 run = [
@@ -250,17 +277,26 @@ run = "go run ./examples/transformer"
 
 [tasks."bench:record"]
 description = "Record hardware metadata and repeated scalar/SIMD benchmarks"
-run = [
-  "mkdir -p benchmark-results",
-  "date -u '+%Y-%m-%dT%H:%M:%SZ' > benchmark-results/hardware.txt",
-  "git log -1 --format=source_commit=%H >> benchmark-results/hardware.txt",
-  "go version >> benchmark-results/hardware.txt",
-  "go env GOOS GOARCH GOAMD64 GOARM64 >> benchmark-results/hardware.txt",
-  "uname -a >> benchmark-results/hardware.txt",
-  "if command -v lscpu >/dev/null 2>&1; then lscpu >> benchmark-results/hardware.txt; else sysctl -n machdep.cpu.brand_string >> benchmark-results/hardware.txt; fi",
-  "go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > benchmark-results/scalar.txt",
-  "GOEXPERIMENT=simd go test -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > benchmark-results/simd.txt"
-]
+run = '''
+set -eu
+directory="${GOML_BENCH_DIR:-benchmark-results/$(date -u '+%Y%m%dT%H%M%SZ')}"
+mkdir -p "$directory"
+{
+  date -u '+%Y-%m-%dT%H:%M:%SZ'
+  git log -1 --format=source_commit=%H
+  git status --short
+  go version
+  go env GOOS GOARCH GOAMD64 GOARM64 GOFLAGS CGO_ENABLED GOEXPERIMENT
+  printf 'GOMAXPROCS=%s\nGOML_YOLO_MODEL=%s\nbenchtime=100ms count=3 package_parallelism=1\n' "${GOMAXPROCS:-runtime default}" "${GOML_YOLO_MODEL:-unset (model benchmarks skipped)}"
+  uname -a
+  if command -v lscpu >/dev/null 2>&1; then lscpu; else sysctl -n machdep.cpu.brand_string; fi
+} > "$directory/hardware.txt"
+git diff --binary > "$directory/source.diff"
+git ls-files --cached --others --exclude-standard -z | tar -czf "$directory/source.tar.gz" --null -T -
+go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > "$directory/scalar.txt"
+GOEXPERIMENT=simd go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... > "$directory/simd.txt"
+printf 'Recorded benchmarks in %s\n' "$directory"
+'''
 
 [tasks."deps:tidy"]
 description = "Tidy module dependencies"
@@ -361,17 +397,17 @@ dir = "contrib/nn/yolo"
 run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
 
 [tasks."bench:yolo"]
-description = "Benchmark YOLO preprocessing and postprocessing"
+description = "Benchmark YOLO preparation, NMS, and optional pretrained 320/640 inference"
 dir = "contrib/nn/yolo"
 run = "go test -run '^$' -bench=. -benchmem ./..."
 
 [tasks."deps:tidy:yolo"]
-description = "Tidy YOLO dependencies after nn v0.3.0 is published"
+description = "Tidy YOLO dependencies"
 dir = "contrib/nn/yolo"
 run = "go mod tidy"
 
 [tasks."test:standalone:yolo"]
-description = "Verify YOLO's published dependencies after nn v0.3.0 is released"
+description = "Verify YOLO's published tensor v0.2.0 and nn v0.4.0 dependencies"
 dir = "contrib/nn/yolo"
 env = { GOWORK = "off" }
 run = "go test ./..."
