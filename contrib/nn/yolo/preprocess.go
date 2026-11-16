@@ -15,6 +15,18 @@ type letterbox struct {
 	left, top                   int
 }
 
+func letterboxFor(width, height, size int) (letterbox, error) {
+	if !validSize(size) || width <= 0 || height <= 0 || width > 65536 || height > 65536 {
+		return letterbox{}, fmt.Errorf("yolo: preprocess: image dimensions must be in [1,65536] and size a multiple of 32 in [32,1280]")
+	}
+
+	ratio := math.Min(float64(size)/float64(width), float64(size)/float64(height))
+	resizedWidth := max(1, int(math.Round(float64(width)*ratio)))
+	resizedHeight := max(1, int(math.Round(float64(height)*ratio)))
+
+	return letterbox{width: width, height: height, resizedWidth: resizedWidth, resizedHeight: resizedHeight, left: (size - resizedWidth) / 2, top: (size - resizedHeight) / 2}, nil
+}
+
 func prepare(source image.Image, size int) (*tensor.Tensor, letterbox, error) {
 	var transform letterbox
 	if source == nil || !validSize(size) {
@@ -24,14 +36,13 @@ func prepare(source image.Image, size int) (*tensor.Tensor, letterbox, error) {
 	bounds := source.Bounds()
 
 	width, height := bounds.Dx(), bounds.Dy()
-	if width <= 0 || height <= 0 || width > 65536 || height > 65536 {
-		return nil, transform, fmt.Errorf("yolo: preprocess: image dimensions must be in [1,65536]")
+
+	transform, err := letterboxFor(width, height, size)
+	if err != nil {
+		return nil, transform, err
 	}
 
-	ratio := math.Min(float64(size)/float64(width), float64(size)/float64(height))
-	resizedWidth := max(1, int(math.Round(float64(width)*ratio)))
-	resizedHeight := max(1, int(math.Round(float64(height)*ratio)))
-	transform = letterbox{width: width, height: height, resizedWidth: resizedWidth, resizedHeight: resizedHeight, left: (size - resizedWidth) / 2, top: (size - resizedHeight) / 2}
+	resizedWidth, resizedHeight := transform.resizedWidth, transform.resizedHeight
 
 	values := make([]float32, 3*size*size)
 	for i := range values {

@@ -7,7 +7,7 @@
 **Pretrained YOLOv8n object detection on the CPU, powered by goml.**
 
 ![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8)
-![yolo](https://img.shields.io/badge/yolo-v0.2.0-blue)
+![yolo](https://img.shields.io/badge/yolo-v0.3.0-blue)
 ![Runtime](https://img.shields.io/badge/runtime-pure%20Go-555)
 
 [Quick start](#quick-start) · [Go API](#go-api) · [Conversion](#weight-conversion) · [Validation](#numerical-validation) · [Project](../../../README.md)
@@ -21,8 +21,8 @@ Inference uses goml's float32 tensor and neural network libraries.
 It requires no Python process, CGo, ONNX Runtime, GPU, or external inference service.
 
 The module path is `github.com/bpradana/goml/contrib/nn/yolo`.
-It has its own go.mod and release tag, `contrib/nn/yolo/v0.2.0`.
-It requires nn v0.4.0 and tensor v0.2.0; simdops remains at v0.1.0.
+It has its own go.mod and release tag, `contrib/nn/yolo/v0.3.0`.
+It requires nn v0.5.0 and tensor v0.3.0; simdops remains at v0.1.0.
 These versioned dependencies support installation outside the repository workspace.
 
 ## Supported model
@@ -34,7 +34,7 @@ These versioned dependencies support installation outside the repository workspa
 | Input | One image, RGB, square model input at a multiple of 32 from 32 to 1280. |
 | Output | Class ID, label, confidence, and clipped XYXY box in original image pixels. |
 | Default settings | Size 640, confidence 0.25, class-aware NMS IoU 0.45, at most 300 detections. |
-| Execution | Pure-Go, CPU-only float32 inference. No training graph is constructed. |
+| Execution | Pure-Go CPU Float32 inference by default. Explicit Metal execution is available through device-aware tensor operations. No training graph is constructed. |
 | Conversion | Offline Python tool pinned to Ultralytics 8.3.0 and PyTorch 2.5.1. |
 
 Other YOLO families, larger width/depth variants, segmentation, pose, rotated boxes, and end-to-end heads are not supported.
@@ -69,7 +69,7 @@ This is a functional example, not an accuracy evaluation.
 Install the Go library independently:
 
 ```sh
-go get github.com/bpradana/goml/contrib/nn/yolo@v0.2.0
+go get github.com/bpradana/goml/contrib/nn/yolo@v0.3.0
 ```
 
 ## Go API
@@ -108,6 +108,24 @@ All Options fields are explicit; start with DefaultOptions and change the settin
 Confidence and IoU must be in `[0,1]` and MaxDetections in `[1,10000]`.
 Results are sorted by descending confidence; ties preserve anchor order.
 Empty detections return a non-nil empty slice.
+
+## Metal inference
+
+Load constructs a CPU model. ToDevice uploads weights explicitly and preserves parameter identity.
+Detect uploads the prepared image, keeps activations on the selected device, then downloads final heads
+for CPU decoding and NMS. It closes temporary GPU values automatically.
+Forward accepts a device-matching input and returns three caller-owned GPU heads.
+Postprocess exposes decoding and coordinate restoration separately and explicitly downloads GPU heads when supplied.
+Close releases the model's GPU leases. CPU tensors remain ordinary Go values.
+
+The YOLO module does not import Metal. The backend's separate integration module contains the runnable example:
+
+```sh
+mise run example:gpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 640
+```
+
+See [Metal setup](../../backend/metal/README.md), [GPU ownership](../../../docs/gpu.md),
+and [measured 320/640 parity and latency](../../../docs/performance/metal.md).
 
 ## Inference path
 
@@ -206,7 +224,7 @@ Run `mise run check` for the complete workspace, or the module-specific tasks ab
 The new primitives live in [nn/layer](../../../nn/layer/README.md) and [nn/activation](../../../nn/activation/README.md).
 YOLO-specific C2f, bottleneck, SPPF composition, model conversion, decoding, and NMS stay in this module.
 
-Release dependencies in order: `tensor/v0.2.0`, then `nn/v0.4.0`, then `contrib/nn/yolo/v0.2.0`.
+Release dependencies in order: `tensor/v0.3.0`, then `nn/v0.5.0`, then `contrib/nn/yolo/v0.3.0`.
 Run `GOWORK=off mise run deps:tidy:yolo` to refresh dependency checksums and
 `mise run test:standalone:yolo` to validate the versioned dependencies.
 The [release workflow](../../../.github/workflows/release.yml) recognizes the nested module tag and generates module-specific release notes.

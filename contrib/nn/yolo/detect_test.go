@@ -1,11 +1,39 @@
 package yolo
 
 import (
+	"image"
 	"math"
 	"testing"
 
 	"github.com/bpradana/goml/tensor"
 )
+
+func TestPostprocess_RestoresCoordinatesAndRejectsInvalidMetadata(t *testing.T) {
+	model := &Model{classes: []string{"object"}}
+	options := DefaultOptions()
+	options.Size = 32
+	heads := emptyHeads(t, 1, 32)
+	values := heads[0].Data()
+	values[64*16] = 100
+	heads[0], _ = tensor.From(values, 1, 65, 4, 4)
+
+	detections, err := model.Postprocess(heads, image.Pt(64, 32), options)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(detections) != 1 || detections[0].Box != (Box{0, 0, 64, 32}) {
+		t.Fatal("letterbox coordinates were not restored", detections)
+	}
+
+	if _, err := model.Postprocess(heads, image.Pt(0, 32), options); err == nil {
+		t.Fatal("invalid original dimensions accepted")
+	}
+
+	if _, err := (*Model)(nil).Postprocess(heads, image.Pt(64, 32), options); err == nil {
+		t.Fatal("uninitialized model accepted")
+	}
+}
 
 func emptyHeads(t *testing.T, classes, size int) [3]*tensor.Tensor {
 	t.Helper()

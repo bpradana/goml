@@ -29,6 +29,34 @@ func (m *Model) Classes() []string {
 // normally lie in [0,1]. Size must be a multiple of 32 in [32,1280]. Invalid
 // shapes and uninitialized models return errors. Outputs own their storage.
 func (m *Model) Forward(input *tensor.Tensor) ([3]*tensor.Tensor, error) {
+	if input == nil || input.Device() == nil {
+		return m.forward(input)
+	}
+
+	scope, err := tensor.NewScope(input.Device())
+	if err != nil {
+		return [3]*tensor.Tensor{}, err
+	}
+	defer func() { _ = scope.Close() }()
+
+	scoped, err := scope.To(input)
+	if err != nil {
+		return [3]*tensor.Tensor{}, err
+	}
+
+	heads, err := m.forward(scoped)
+	if err != nil {
+		return [3]*tensor.Tensor{}, err
+	}
+
+	for _, head := range heads {
+		head.Keep()
+	}
+
+	return heads, nil
+}
+
+func (m *Model) forward(input *tensor.Tensor) ([3]*tensor.Tensor, error) {
 	var result [3]*tensor.Tensor
 	if m == nil || len(m.classes) == 0 || input == nil {
 		return result, fmt.Errorf("yolo: forward: uninitialized model or input")

@@ -69,11 +69,52 @@ func (m *Model) Detect(source image.Image, options Options) ([]Detection, error)
 		return nil, err
 	}
 
+	if device := m.Device(); device != nil {
+		input, err = input.To(device)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = input.Close() }()
+	}
+
 	heads, err := m.Forward(input)
 	if err != nil {
 		return nil, err
 	}
 
+	defer func() {
+		for _, head := range heads {
+			_ = head.Close()
+		}
+	}()
+
+	return m.postprocess(heads, transform, options)
+}
+
+// Postprocess explicitly reads raw Forward heads, decodes DFL boxes, applies
+// class-aware NMS, and restores coordinates for the original image dimensions.
+// CPU heads stay on CPU; GPU heads are synchronized and downloaded here.
+// It does not close the supplied heads. Input preparation must use Detect's
+// letterboxing convention and options.Size. Invalid dimensions, options, model,
+// head shapes, or nonfinite logits return errors.
+func (m *Model) Postprocess(heads [3]*tensor.Tensor, original image.Point, options Options) ([]Detection, error) {
+	if m == nil || len(m.classes) == 0 {
+		return nil, fmt.Errorf("yolo: postprocess: uninitialized model")
+	}
+
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	transform, err := letterboxFor(original.X, original.Y, options.Size)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.postprocess(heads, transform, options)
+}
+
+func (m *Model) postprocess(heads [3]*tensor.Tensor, transform letterbox, options Options) ([]Detection, error) {
 	candidates, err := decode(heads, m.classes, options)
 	if err != nil {
 		return nil, err
@@ -110,7 +151,11 @@ func decode(heads [3]*tensor.Tensor, classes []string, options Options) ([]Detec
 			return nil, fmt.Errorf("yolo: decode: invalid head %d shape", scale)
 		}
 
-		values := head.Data()
+		values, err := head.HostData()
+		if err != nil {
+			return nil, err
+		}
+
 		for _, value := range values {
 			if math.IsNaN(float64(value)) || math.IsInf(float64(value), 0) {
 				return nil, fmt.Errorf("yolo: decode: nonfinite head %d", scale)
