@@ -188,11 +188,13 @@ run = [
 ]
 
 [tasks."test:fuzz"]
-description = "Fuzz layouts, broadcasting, and tensor views"
+description = "Fuzz tensor layouts, views, checkpoint files, and network metadata"
 run = [
   "go test -run '^$' -fuzz '^FuzzShapes$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
   "go test -run '^$' -fuzz '^FuzzBroadcast$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
-  "go test -run '^$' -fuzz '^FuzzViews$' -fuzztime=3s -parallel=2 ./tensor"
+  "go test -run '^$' -fuzz '^FuzzViews$' -fuzztime=3s -parallel=2 ./tensor",
+  "go test -run '^$' -fuzz '^FuzzUnmarshal$' -fuzztime=3s -parallel=2 ./nn/checkpoint",
+  "go test -run '^$' -fuzz '^FuzzRestore$' -fuzztime=3s -parallel=2 ./nn/layer"
 ]
 
 [tasks."example:tensor"]
@@ -278,6 +280,7 @@ run = [
   "go doc github.com/bpradana/goml/tensor",
   "go doc github.com/bpradana/goml/nn",
   "go doc github.com/bpradana/goml/nn/activation",
+  "go doc github.com/bpradana/goml/nn/checkpoint",
   "go doc github.com/bpradana/goml/nn/layer",
   "go doc github.com/bpradana/goml/nn/loss",
   "go doc github.com/bpradana/goml/nn/optimizer"
