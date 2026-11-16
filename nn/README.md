@@ -18,8 +18,8 @@ The underlying [tensor](../tensor/README.md) module remains an ordinary numerica
 
 The module path is `github.com/bpradana/goml/nn`.
 Activation, layer, loss, and optimizer packages belong to this module.
-Install the published module with `go get github.com/bpradana/goml/nn@v0.1.0`.
-The additional convolution, recurrent, and transformer layers in this checkout are unreleased.
+Install nn v0.2.0 with `go get github.com/bpradana/goml/nn@v0.2.0`.
+Its tensor dependency remains at the published v0.1.0 API.
 
 ## Packages
 
@@ -28,6 +28,7 @@ The additional convolution, recurrent, and transformer layers in this checkout a
 | `/nn` | `Value`, `Parameter`, numerical operations | Immutable values, differentiable primitives, and graph ownership. |
 | `/nn/layer` | `Layer`, `NewDense`, `NewSequential`, plus the development layers below. | Model composition and parameter discovery. |
 | `/nn/activation` | `NewReLU`, `NewSigmoid`, `NewTanh`, `NewSoftmax` | Activation layers and their derivative rules. |
+| `/nn/checkpoint` | `SaveWeights`, `LoadWeights`, `Save`, `Load`, `Marshal`, `Unmarshal` | Weight and built-in network persistence. |
 | `/nn/loss` | `Loss[T]`, `NewMSE`, `NewCrossEntropy` | Scalar objectives with explicit target types. |
 | `/nn/optimizer` | `Optimizer`, `NewSGD`, `NewAdam` | Parameter updates, gradient clearing, and Adam moments. |
 
@@ -48,7 +49,7 @@ It requires predictions within 0.001 of the targets.
 The XOR example composes two Dense layers with Tanh and Sigmoid activations and uses Adam.
 It requires predictions within 0.1 after 1,000 steps.
 
-The development checkout adds four complete training programs:
+Four additional training programs demonstrate the model layers:
 
 ```sh
 mise run example:cnn
@@ -219,9 +220,9 @@ Parameters returns each shared parameter once.
 The [Layer interface](layer/layer.go) contains only Forward and Parameters.
 There is no reflection-based discovery or layer registry.
 
-### Additional development layers
+### Convolution, recurrent, and attention layers
 
-These constructors are available in this checkout, after nn/v0.1.0:
+These constructors are available in nn v0.2.0:
 
 | Layer | Shape contract |
 | --- | --- |
@@ -312,8 +313,31 @@ The [MNIST example](examples/mnist/README.md) reads local gzip-compressed IDX fi
 Downloads are explicit. Tests generate small local fixtures and exercise the loader and a training step.
 
 The default model is 784 → 32 → 10 with ReLU and Adam.
-The example reports training cross-entropy.
+Use `-model cnn` for a two-convolution classifier.
+Training reports cross-entropy and saves both architecture-plus-weights and weights-only files.
+Load a saved network with `-load-model data/mnist-model.goml -predict` for inference.
 No real-dataset or held-out accuracy result is claimed.
+
+## Saving models and weights
+
+Use [nn/checkpoint](checkpoint/README.md) to save and restore models:
+
+```go
+if err := checkpoint.Save("data/model.goml", model); err != nil {
+    return err
+}
+
+restored, err := checkpoint.Load("data/model.goml")
+if err != nil {
+    return err
+}
+```
+
+SaveWeights and LoadWeights operate on matching ordered parameter lists.
+Marshal and Unmarshal use the same complete network format in memory.
+All current built-in layers and activations are supported, including shared and nested Sequential models.
+Custom layers can use weights-only persistence.
+Gradients, optimizer moments, and runtime recurrent states are not serialized.
 
 ## Verification and limits
 
@@ -329,7 +353,7 @@ Finite-difference checks cover operations, reductions, views, activations, and l
 Exact tests cover shared graphs, accumulation, consuming backward, typed loss interfaces, and optimizer references.
 See [validation](../docs/testing.md) and [performance](../docs/performance.md).
 
-The current release scope covers dense networks and first-order eager differentiation.
-There is no retain-graph option, higher-order autodiff, convolution, transformer API, or checkpoint format.
+nn v0.2.0 adds convolution, recurrent layers, transformer encoders, and checkpoints to the dense-network APIs.
+There is no retain-graph option, higher-order autodiff, external pretrained-format importer, or GPU runtime.
 
 Licensed under [MIT](../LICENSE).

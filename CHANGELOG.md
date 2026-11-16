@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## nn v0.2.0
+
+Tensor and simdops remain at v0.1.0. Their APIs and nn's published upstream requirements are unchanged.
 
 - Conv2D with NCHW layout, square kernels, stride, symmetric zero padding, and optional bias.
 - Batch-first RNN and LSTM layers with explicit caller-owned recurrent states.
@@ -10,6 +12,10 @@
 - Differentiable Slice, Concat, Contiguous, Scale, and a validated multi-input custom operation boundary.
 - Seeded CNN, RNN, LSTM, and transformer training examples with convergence checks and mise tasks.
 - A CNN option in the MNIST example, sharing local IDX loading and batching with the default dense model.
+- Versioned, checksummed float32 weight files and complete built-in Sequential network serialization in nn/checkpoint.
+- Architecture reconstruction preserving nested and shared layers without random weight initialization.
+- MNIST checkpoint saving, loading, warm starts, and inference-only evaluation.
+- Checkpoint corruption, metadata, round-trip, and state-preservation tests, plus file and architecture fuzz targets.
 - Independent scalar references, weighted finite-difference layer checks, and advanced-layer benchmarks.
 - Module-specific GitHub release-note automation for pushed tags and manual backfills.
 - Standalone module checks in regular CI and updated published-module installation instructions.

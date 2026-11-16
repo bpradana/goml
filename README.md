@@ -8,7 +8,9 @@
 
 ![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8)
 ![Execution](https://img.shields.io/badge/CPU-amd64%20%C2%B7%20arm64-555)
-![Release](https://img.shields.io/badge/released-v0.1.0-blue)
+![simdops](https://img.shields.io/badge/simdops-v0.1.0-blue)
+![tensor](https://img.shields.io/badge/tensor-v0.1.0-blue)
+![nn](https://img.shields.io/badge/nn-v0.2.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Quick start](#quick-start) ·
@@ -29,9 +31,9 @@ The runtime uses Go and its standard library. Tensors contain `float32` values,
 views share immutable storage, and training uses eager reverse-mode differentiation.
 Default builds use scalar kernels. Go's experimental portable SIMD API is optional.
 
-**Release status:** all three modules have published v0.1.0 tags.
-This development checkout also contains unreleased convolutional, recurrent, and transformer layers.
-Use the versioned modules for v0.1.0, or this checkout for the additional [layers and examples](docs/layers.md).
+**Module versions:** simdops v0.1.0, tensor v0.1.0, and nn v0.2.0.
+The nn release includes convolutional, recurrent, transformer, and checkpoint APIs.
+See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/README.md) for their APIs and examples.
 
 ## Contents
 
@@ -60,23 +62,23 @@ Use the versioned modules for v0.1.0, or this checkout for the additional [layer
 | Tensor mathematics | Trailing-dimension broadcasting, reductions, Exp, Log, Sqrt, and 2D matrix multiplication over contiguous or strided inputs. |
 | Differentiation | Eager reverse-mode graphs, shared-dependency accumulation, broadcast gradients, and consuming backward passes. |
 | Models | Dense layers, ReLU, Sigmoid, Tanh, and Sequential composition with seeded Xavier initialization. |
-| Additional models · unreleased | Conv2D, RNN, LSTM, multi-head self-attention, LayerNorm, positional encoding, and transformer encoder blocks. |
+| Additional models | Conv2D, RNN, LSTM, multi-head self-attention, LayerNorm, positional encoding, and transformer encoder blocks. |
+| Checkpoints | Save weights or complete built-in Sequential networks, preserving shared layers and exact float32 values. |
 | Training | Typed MSE and cross-entropy loss objects, SGD, Adam, and explicit inference without gradient graphs. |
 | Verification | Numerical references, finite-difference checks, fuzzing, race detection, linting, and measured performance baselines. |
 | Tooling | A Go workspace and mise tasks for all three modules. GitHub workflows use the same tasks. |
 
 ## Install
 
-Choose the module your application needs:
+From your application's Go module, install the library you need:
 
 ```sh
 go get github.com/bpradana/goml/simdops@v0.1.0
 go get github.com/bpradana/goml/tensor@v0.1.0
-go get github.com/bpradana/goml/nn@v0.1.0
+go get github.com/bpradana/goml/nn@v0.2.0
 ```
 
 Each command includes that module's dependencies. Go 1.27.3 or later is required.
-The additional neural network layers below require the development checkout until their next nn release.
 
 ## Quick start
 
@@ -103,7 +105,7 @@ mise run example:linear
 mise run example:xor
 ```
 
-The development checkout also provides these generated-data training examples:
+Run these additional generated-data training examples:
 
 ```sh
 mise run example:cnn
@@ -333,7 +335,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 - **Basic indexing.** Unit-step slices and axis permutations, without advanced indexing or negative axes.
 - **Eager graphs.** Backward consumes each graph. There is no retain-graph option, higher-order differentiation, or graph compiler.
 - **Initial model implementations.** Conv2D uses square kernels without groups or dilation. Recurrent layers are unidirectional. Transformer blocks have no dropout, padding masks, or decoder.
-- **Model persistence.** No checkpoints, pretrained models, or distributed training.
+- **Checkpoint scope.** Built-in Sequential networks and weights are supported. Optimizer state, runtime recurrent state, external pretrained formats, and distributed training are excluded.
 - **Release evidence.** Native amd64 execution and real-dataset MNIST accuracy remain open validation items. Published upstream dependencies pass local standalone checks.
 
 ## Documentation
@@ -345,6 +347,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 | [Tensor semantics](docs/tensor-semantics.md) | Shapes, views, broadcasting, reductions, and errors. |
 | [Autograd](docs/autograd.md) | Graph lifecycle, gradients, loss targets, and inference. |
 | [Neural network layers](docs/layers.md) | Convolution, recurrent state, attention, and transformer contracts. |
+| [Checkpoints](nn/checkpoint/README.md) | Weight files, network serialization, validation, and loading semantics. |
 | [Development](docs/development.md) | Tools, tasks, dependencies, and troubleshooting. |
 | [Validation](docs/testing.md) | Numerical references, fuzzing, portability, and current evidence. |
 | [Performance](docs/performance.md) | Measurements, method, tradeoffs, and reproduction. |

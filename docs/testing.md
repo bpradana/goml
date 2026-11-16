@@ -93,13 +93,15 @@ They also verify target gradients for MSE and saved class-label semantics for cr
 
 ## Fuzzing
 
-The bounded fuzz task runs three targets:
+The bounded fuzz task runs five targets:
 
 | Target | Properties |
 | --- | --- |
 | FuzzShapes | Negative dimensions and overflow, checked against arbitrary-precision multiplication. |
 | FuzzBroadcast | Valid broadcast dimensions and incompatible shape pairs. |
 | FuzzViews | Transpose round trips, contiguous copies, reshape preservation, indexing, and slice bounds. |
+| FuzzUnmarshal | Checkpoint headers, byte lengths, checksums, JSON payloads, and model decoding. |
+| FuzzRestore | Architecture references, layer metadata, cycles, parameter references, and bounded reconstruction. |
 
 Each target runs for three seconds with two workers.
 Input sizes bound tensor allocations.
@@ -123,6 +125,7 @@ Local checks use Go 1.27.3 on macOS arm64 with an Apple M1 Pro.
 | Standalone modules | All three pass with workspace mode disabled and published upstream v0.1.0 dependencies. |
 | Linear regression and XOR | Passed their convergence checks. |
 | MNIST fixtures | Loader checks, dense and CNN training, partial batches, parameter gradients, and seeded inference passed. |
+| Checkpoints | Built-in model round trips, shared identity, exact float32 bits, corruption checks, and loading without partial parameter changes. |
 | Additional model examples | CNN, RNN, LSTM, and transformer pass their convergence checks. |
 
 Cross-compilation checks build compatibility.
@@ -133,13 +136,18 @@ The recorded report also identified one module-level vulnerability that the code
 That report is a point-in-time database result.
 Nancy was not run because its external service access is optional.
 
+Checkpoint tests compare predictions before and after restoration for dense, convolutional, recurrent, attention, and transformer models.
+Restored models must build new training graphs and receive parameter gradients.
+Weights tests preserve signed zero, NaN payload bits, infinities, and noncontiguous logical values.
+Failure tests check that late shape mismatches preserve every original value and gradient.
+File tests check replacement, permissions, temporary-file cleanup, unsupported kinds, and malformed metadata.
+
 ## Remaining release evidence
 
 | Item | Status |
 | --- | --- |
 | Native amd64 tests and benchmarks | Requires a native runner or target machine. |
 | Hosted GitHub workflows | Configured locally, not executed on GitHub yet. |
-| Future nn release publication | Additional layers are tested locally and remain unreleased. |
 | Real MNIST dataset training | Not measured in this checkout. |
 | Held-out MNIST accuracy | Not measured. |
 

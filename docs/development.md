@@ -65,7 +65,7 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:race` | Runs the Go race detector across all modules. |
 | `test:simd` | Tests every module with `GOEXPERIMENT=simd`. |
 | `test:coverage` | Reports package statement coverage. |
-| `test:fuzz` | Runs bounded layout, broadcasting, and view fuzz checks. |
+| `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
 | `test:standalone` | Tests all modules with `GOWORK=off`. Requires published upstream versions. |
 | `build:portable` | Cross-compiles Linux amd64/arm64, with CGo disabled, scalar and SIMD. |
 | `bench:record` | Records hardware metadata and repeated scalar/SIMD measurements. |

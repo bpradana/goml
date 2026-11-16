@@ -2,8 +2,7 @@
 
 [Documentation](README.md) · [nn API](../nn/README.md) · [Examples](../nn/examples/README.md)
 
-This guide describes the additional layers in the development checkout.
-Conv2D, recurrent layers, attention, and TransformerEncoder are not part of the published nn/v0.1.0 tag.
+This guide describes the convolution, recurrent, attention, and transformer layers in nn v0.2.0.
 They use the existing tensor v0.1.0 API and require no new runtime dependencies.
 
 ## Choose a layer

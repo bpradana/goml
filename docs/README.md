@@ -12,6 +12,7 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | Build and train a neural network | [nn](../nn/README.md) |
 | Use convolution, recurrent state, or transformer blocks | [Layers](layers.md) |
 | Run generated-data training programs | [Neural network examples](../nn/examples/README.md) |
+| Save weights or restore a network | [Checkpoints](../nn/checkpoint/README.md) |
 | Understand module and package boundaries | [Architecture](architecture.md) |
 | Check shape, memory, or numerical behavior | [Tensor semantics](tensor-semantics.md) |
 | Understand backward, accumulation, or inference | [Autograd](autograd.md) |
@@ -30,15 +31,15 @@ Run this command from the repository root:
 mise run docs:api
 ```
 
-It prints GoDoc for the three modules and nn's activation, layer, loss, and optimizer packages.
+It prints GoDoc for the three modules and nn's activation, checkpoint, layer, loss, and optimizer packages.
 Exported function comments define input constraints, output shapes, errors, and ownership.
 
 The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-All three modules have published v0.1.0 tags and pass local standalone checks.
-This development checkout includes additional unreleased nn layers and examples.
+The module versions are simdops v0.1.0, tensor v0.1.0, and nn v0.2.0.
+All three modules pass local standalone checks using published upstream dependencies.
 Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from

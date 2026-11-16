@@ -15,6 +15,8 @@ flowchart TD
         Activation["nn/activation<br/>activation layers"] --> Core
         Loss["nn/loss<br/>typed objectives"] --> Core
         Optimizer["nn/optimizer<br/>parameter updates"] --> Core
+        Checkpoint["nn/checkpoint<br/>network and weight persistence"] --> Layer
+        Checkpoint --> Core
     end
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
@@ -163,8 +165,19 @@ The [performance report](performance.md) records the existing baseline.
 ## Scope
 
 The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
-The development checkout adds convolution, recurrent layers, and transformer encoder blocks after nn/v0.1.0.
+nn v0.2.0 includes convolution, recurrent layers, transformer encoder blocks, and model persistence.
 It has no CGo, GPU backend, device abstraction, JIT, compiled graph engine, or distributed-training layer.
 
 Future numerical types and additional operations must preserve the ownership and dependency boundaries.
 Internal extension points do not imply public backend or plugin interfaces.
+
+## Persistence boundaries
+
+The checkpoint package owns the versioned file format, tensor byte encoding, checksums, and file replacement.
+`layer.MarshalConfig` and `layer.Restore` own architecture descriptions and concrete layer reconstruction.
+Restoration uses supplied tensors without allocating random weight arrays.
+
+Network metadata references shared layers and parameters by index.
+It does not serialize autograd nodes, optimizer state, or arbitrary Go objects.
+The root nn package does not import checkpoint, and tensor remains independent of model persistence.
+See the [checkpoint contract](../nn/checkpoint/README.md) for validation and ownership rules.

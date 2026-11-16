@@ -5,26 +5,26 @@
 Each module has an independent version and a Go subdirectory tag.
 This procedure publishes dependencies before their consumers.
 
-**Current state:** simdops/v0.1.0, tensor/v0.1.0, and nn/v0.1.0 are published.
-The development checkout contains additional unreleased nn layers.
-Its current tensor and simdops requirements still resolve v0.1.0.
-Documentation changes and local commits do not publish a new module version.
+**Release set:** nn/v0.2.0, with tensor and simdops remaining at v0.1.0.
+The upstream v0.1.0 tags already exist and satisfy nn's required APIs.
+This release needs one new tag, nn/v0.2.0.
+Keep the existing upstream tags unchanged.
 
 ## Version and dependency order
 
 ```mermaid
 flowchart LR
-    SIMD["simdops/v0.1.0<br/>publish first"] --> Tensor["tensor/v0.1.0<br/>requires simdops v0.1.0"]
-    Tensor --> NN["nn/v0.1.0<br/>requires tensor v0.1.0"]
+    SIMD["simdops/v0.1.0<br/>existing upstream"] --> Tensor["tensor/v0.1.0<br/>existing upstream"]
+    Tensor --> NN["nn/v0.2.0<br/>requires tensor v0.1.0"]
 ```
 
 | Module | Tag | Required upstream release |
 | --- | --- | --- |
 | simdops | `simdops/v0.1.0` | None. |
 | tensor | `tensor/v0.1.0` | `simdops/v0.1.0` |
-| nn | `nn/v0.1.0` | `tensor/v0.1.0` |
+| nn | `nn/v0.2.0` | `tensor/v0.1.0` |
 
-Layer, loss, and optimizer packages share the nn module's version.
+Activation, checkpoint, layer, loss, and optimizer packages share the nn module's version.
 Do not create separate tags for those subpackages.
 
 ## Prepare the candidate
@@ -57,48 +57,34 @@ Update the validation status for the candidate.
 Cross-compilation is not native target execution.
 MNIST fixtures do not establish real-dataset accuracy.
 
-## Publish simdops
+## Prepare nn dependencies
 
-Verify the leaf module without workspace resolution:
-
-```sh
-GOWORK=off mise run deps:tidy:simdops
-GOWORK=off mise run test:simdops
-```
-
-Review and commit any manifest or checksum changes.
-Create and publish `simdops/v0.1.0` only from the reviewed commit.
-
-The tag must be available to Go module resolution before the tensor stage.
-A local tag alone is insufficient.
-
-## Publish tensor
-
-Keep tensor's simdops requirement on the published version.
-Then run:
-
-```sh
-GOWORK=off mise run deps:tidy:tensor
-GOWORK=off mise run test:tensor
-```
-
-Review and commit tensor's manifest and generated go.sum.
-Create and publish `tensor/v0.1.0` from that reviewed commit.
-
-Wait until the version resolves before preparing nn.
-
-## Publish nn
-
-Keep nn's tensor requirement on the published version.
-Then run:
+Keep nn's tensor requirement at v0.1.0.
+The new layers and checkpoint APIs use that existing numerical API.
+Validate the module without local workspace resolution:
 
 ```sh
 GOWORK=off mise run deps:tidy:nn
 GOWORK=off mise run test:nn
 ```
 
-Review and commit nn's manifest and generated go.sum.
-Create and publish `nn/v0.1.0` from the reviewed commit.
+Review any manifest or checksum changes and commit them when needed.
+If no dependency files changed, proceed without an empty dependency commit.
+
+## Publish nn v0.2.0
+
+After the reviewed release commit is on main, create and push the module tag:
+
+```sh
+git tag nn/v0.2.0
+git push origin main nn/v0.2.0
+```
+
+The tag push triggers the release-note workflow.
+The workflow verifies the tagged module before creating its GitHub release.
+Do not create new tensor or simdops tags for this release set.
+
+For future upstream changes, publish those modules first and then update their downstream requirements.
 
 ## Final verification
 
