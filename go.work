@@ -3,6 +3,8 @@ go 1.27.3
 use (
 	./contrib/backend/metal
 	./contrib/backend/metal/examples
+	./contrib/backend/webgpu
+	./contrib/backend/webgpu/examples
 	./contrib/nn/yolo
 	./nn
 	./simdops

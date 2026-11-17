@@ -558,8 +558,8 @@ description = "Test Metal conformance on supported Apple hardware"
 run = [{ task = "test:gpu:metal" }]
 
 [tasks."lint:backend"]
-description = "Lint backend contracts, CPU kernels, examples, and Metal"
-run = [{ task = "lint:tensor" }, { task = "lint:gpu:metal" }]
+description = "Lint backend contracts, CPU kernels, Metal, and WebGPU"
+run = [{ task = "lint:tensor" }, { task = "lint:gpu:metal" }, { task = "lint:gpu:webgpu" }]
 
 [tasks."bench:backend:cpu"]
 description = "Benchmark CPU kernels, convolution, and complete model inference"
@@ -579,3 +579,97 @@ description = "Test GPU integration examples against published modules on Apple 
 dir = "contrib/backend/metal/examples"
 env = { GOWORK = "off" }
 run = "go test ./..."
+
+[tasks."deps:tidy:webgpu"]
+description = "Tidy the independent WebGPU module"
+dir = "contrib/backend/webgpu"
+run = "go mod tidy"
+
+[tasks."build:gpu:webgpu"]
+description = "Build the native WebGPU backend"
+dir = "contrib/backend/webgpu"
+run = "go build ./..."
+
+[tasks."test:gpu:webgpu"]
+description = "Run WebGPU conformance and native lifecycle tests on hardware"
+dir = "contrib/backend/webgpu"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -count=1 ./..."
+
+[tasks."test:backend:webgpu"]
+run = [{ task = "test:gpu:webgpu" }]
+
+[tasks."bench:backend:webgpu"]
+run = [{ task = "bench:gpu:webgpu" }]
+
+[tasks."fmt:gpu:webgpu"]
+description = "Format WebGPU Go sources and whitespace"
+dir = "contrib/backend/webgpu"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."lint:gpu:webgpu"]
+description = "Lint the independent WebGPU module"
+dir = "contrib/backend/webgpu"
+run = "golangci-lint run ./..."
+
+[tasks."test:gpu:webgpu:race"]
+description = "Run WebGPU tests with the race detector on hardware"
+dir = "contrib/backend/webgpu"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -race ./..."
+
+[tasks."test:gpu:webgpu:portable"]
+description = "Check WebGPU stubs and desktop cross-builds without CGo"
+dir = "contrib/backend/webgpu"
+env = { CGO_ENABLED = "0", GOML_WEBGPU_REQUIRED = "0" }
+run = ["go test ./...", "GOOS=linux GOARCH=amd64 go build ./...", "GOOS=windows GOARCH=amd64 go build ./...", "GOOS=js GOARCH=wasm go build ./..."]
+
+[tasks."bench:gpu:webgpu"]
+description = "Benchmark WebGPU initialization, resident operations, and transfers"
+dir = "contrib/backend/webgpu"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -run '^$' -bench=. -benchmem -benchtime=200ms -count=3 ./..."
+
+[tasks."fmt:check:webgpu"]
+description = "Check WebGPU backend and example formatting"
+run = 'files=$(golangci-lint fmt --diff ./contrib/backend/webgpu/... ./contrib/backend/webgpu/examples/...) && test -z "$files" || { printf "%s\n" "$files"; exit 1; }'
+
+[tasks."fmt:gpu:webgpu:examples"]
+dir = "contrib/backend/webgpu/examples"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."lint:gpu:webgpu:examples"]
+dir = "contrib/backend/webgpu/examples"
+run = "golangci-lint run ./..."
+
+[tasks."test:gpu:webgpu:parity"]
+description = "Test WebGPU models, training, optimizers, checkpoints, and optional YOLO fixtures"
+dir = "contrib/backend/webgpu/examples"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -count=1 -v ./..."
+
+[tasks."test:gpu:webgpu:parity:race"]
+dir = "contrib/backend/webgpu/examples"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -race ./..."
+
+[tasks."test:gpu:webgpu:yolo"]
+description = "Validate WebGPU YOLO using explicit local pretrained assets"
+dir = "contrib/backend/webgpu/examples/yolo"
+env = { GOML_WEBGPU_REQUIRED = "1" }
+run = "go test -count=1 -v ./..."
+
+[tasks."test:gpu:webgpu:standalone"]
+description = "Verify WebGPU against its published dependencies"
+dir = "contrib/backend/webgpu"
+env = { GOWORK = "off", GOML_WEBGPU_REQUIRED = "1" }
+run = "go test ./..."
+
+[tasks."example:gpu:webgpu:matmul"]
+run = "go run ./contrib/backend/webgpu/examples/matmul"
+
+[tasks."example:gpu:webgpu:training"]
+run = "go run ./contrib/backend/webgpu/examples/training"
+
+[tasks."example:gpu:webgpu:yolo"]
+run = "go run ./contrib/backend/webgpu/examples/yolo"
