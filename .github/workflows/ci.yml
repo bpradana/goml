@@ -17,3 +17,6 @@ jobs:
       - run: mise run ci
       - run: mise run test:standalone:data
       - run: mise run build:data:portable
+      - run: mise run test:standalone:metrics
+      - run: mise run test:standalone:trainer
+      - run: mise run build:trainer:portable

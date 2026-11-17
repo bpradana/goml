@@ -31,3 +31,4 @@ jobs:
       - run: mise run test:gpu:portable
       - run: mise run lint:mnist:metal
       - run: mise run test:data:metal
+      - run: mise run test:trainer:metal
