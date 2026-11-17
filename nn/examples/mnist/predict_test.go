@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"math"
 	"math/rand/v2"
 	"testing"
+
+	"github.com/bpradana/goml/data"
 
 	"github.com/bpradana/goml/nn/layer"
 	"github.com/bpradana/goml/tensor"
@@ -38,12 +41,22 @@ func TestPredict_WeightsPartialBatchLossAndUsesInference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	data, err := tensor.Zeros(3, 1, 28, 28)
+	inputs, err := tensor.Zeros(3, 1, 28, 28)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	correct, meanLoss, err := predict(model, data, []int{2, 2, 3}, 2)
+	dataset, err := data.NewClassificationDataset(inputs, []int{2, 2, 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loader, err := data.NewLoader(dataset, data.CollateClassification, data.LoaderOptions{BatchSize: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	correct, meanLoss, err := predict(context.Background(), model, loader, tensor.CPU())
 	if err != nil {
 		t.Fatal(err)
 	}

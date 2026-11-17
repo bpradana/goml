@@ -2,6 +2,7 @@ package main
 
 import (
 	"compress/gzip"
+	"context"
 	"encoding/binary"
 	"math/rand/v2"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"github.com/bpradana/goml/tensor"
 )
 
-func writeIDX(t *testing.T, header []uint32, data []byte) string {
+func writeIDX(t testing.TB, header []uint32, data []byte) string {
 	t.Helper()
 
 	path := filepath.Join(t.TempDir(), "fixture.gz")
@@ -44,47 +45,6 @@ func writeIDX(t *testing.T, header []uint32, data []byte) string {
 	}
 
 	return path
-}
-
-func TestLoad_AcceptsValidImageAndLabelIDX(t *testing.T) {
-	for _, tt := range []struct {
-		name   string
-		header []uint32
-		size   int
-	}{
-		{"Images", []uint32{2051, 1, 28, 28}, 784},
-		{"Labels", []uint32{2049, 1}, 1},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			path := writeIDX(t, tt.header, make([]byte, tt.size))
-			header, data, err := load(path, len(tt.header))
-
-			if err != nil || len(header) != len(tt.header) || len(data) != tt.size {
-				t.Fatalf("unexpected IDX result: %v %d %v", header, len(data), err)
-			}
-		})
-	}
-}
-
-func TestLoad_RejectsMalformedIDX(t *testing.T) {
-	for _, tt := range []struct {
-		name   string
-		header []uint32
-		size   int
-	}{
-		{"BadImageMagic", []uint32{42, 1, 28, 28}, 784},
-		{"BadDimensions", []uint32{2051, 1, 1, 784}, 784},
-		{"ZeroItems", []uint32{2049, 0}, 0},
-		{"TruncatedData", []uint32{2051, 1, 28, 28}, 10},
-		{"ExtraData", []uint32{2049, 1}, 2},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			path := writeIDX(t, tt.header, make([]byte, tt.size))
-			if _, _, err := load(path, len(tt.header)); err == nil {
-				t.Fatal("expected IDX validation error")
-			}
-		})
-	}
 }
 
 func TestRun_TrainsOnLocalIDXFixtures(t *testing.T) {
@@ -211,6 +171,49 @@ func TestRun_RejectsConflictingCheckpointOptions(t *testing.T) {
 	} {
 		if err := run(options); err == nil {
 			t.Fatal("accepted conflicting checkpoint options")
+		}
+	}
+}
+
+func TestSelectedDataset_ExplicitHeldOutSplitAndLimit(t *testing.T) {
+	directory := t.TempDir()
+	for _, prefix := range []string{"train", "t10k"} {
+		images := writeIDX(t, []uint32{2051, 3, 28, 28}, make([]byte, 3*784))
+
+		labels := writeIDX(t, []uint32{2049, 3}, []byte{2, 3, 4})
+		if err := os.Rename(images, filepath.Join(directory, prefix+"-images-idx3-ubyte.gz")); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.Rename(labels, filepath.Join(directory, prefix+"-labels-idx1-ubyte.gz")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	options := runOptions{directory: directory, split: "test", limit: 3, batch: 2, epochs: 1, modelName: "dense", evaluate: true, shuffle: true, seed: 42}
+	if err := run(options); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, split := range []string{"invalid", "train"} {
+		options.split, options.limit = split, 4
+		if _, err := selectedDataset(context.Background(), options); err == nil {
+			t.Fatal("accepted invalid split or excessive limit")
+		}
+	}
+}
+
+func BenchmarkTrainingEndToEnd(b *testing.B) {
+	images := writeIDX(b, []uint32{2051, 128, 28, 28}, make([]byte, 128*784))
+	labels := writeIDX(b, []uint32{2049, 128}, make([]byte, 128))
+	options := runOptions{imagesPath: images, labelsPath: labels, modelName: "dense", limit: 128, epochs: 1, batch: 32}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for range b.N {
+		if err := run(options); err != nil {
+			b.Fatal(err)
 		}
 	}
 }

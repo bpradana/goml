@@ -1,107 +1,72 @@
-// Command mnist trains a small classifier from local gzip-compressed MNIST IDX files.
+// Command mnist trains and evaluates classifiers using local Dataset/DataLoader APIs.
 package main
 
 import (
-	"compress/gzip"
-	"encoding/binary"
+	"context"
+	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"math/rand/v2"
 	"os"
+	"os/signal"
 	"path/filepath"
 
+	"github.com/bpradana/goml/data"
+	"github.com/bpradana/goml/data/datasets/mnist"
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/nn/layer"
 	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
 )
 
 type runOptions struct {
-	imagesPath      string
-	labelsPath      string
-	modelName       string
-	limit           int
-	epochs          int
-	batch           int
-	saveModelPath   string
-	saveWeightsPath string
-	loadModelPath   string
-	loadWeightsPath string
-	predict         bool
+	imagesPath, labelsPath, directory, split, device               string
+	modelName                                                      string
+	limit, epochs, batch                                           int
+	seed                                                           uint64
+	shuffle, evaluate                                              bool
+	saveModelPath, saveWeightsPath, loadModelPath, loadWeightsPath string
+	predict                                                        bool
 }
 
 func main() {
 	var options runOptions
-	flag.StringVar(&options.imagesPath, "images", "data/train-images-idx3-ubyte.gz", "local MNIST image file")
-	flag.StringVar(&options.labelsPath, "labels", "data/train-labels-idx1-ubyte.gz", "local MNIST label file")
-	flag.StringVar(&options.modelName, "model", "dense", "classifier architecture: dense or cnn; ignored with -load-model")
-	flag.IntVar(&options.limit, "limit", 1000, "number of examples")
+	flag.StringVar(&options.imagesPath, "images", "", "optional explicit local image IDX file, plain or .gz")
+	flag.StringVar(&options.labelsPath, "labels", "", "optional explicit local label IDX file, plain or .gz")
+	flag.StringVar(&options.directory, "data", "archive", "local MNIST directory")
+	flag.StringVar(&options.split, "split", "train", "dataset split: train or test")
+	flag.StringVar(&options.device, "device", "cpu", "cpu, or metal with the metal build tag")
+	flag.StringVar(&options.modelName, "model", "dense", "dense or cnn; ignored with -load-model")
+	flag.IntVar(&options.limit, "limit", 1000, "number of selected examples")
 	flag.IntVar(&options.epochs, "epochs", 3, "training epochs")
-	flag.IntVar(&options.batch, "batch", 32, "batch size")
-	flag.StringVar(&options.saveModelPath, "save-model", "data/mnist-model.goml", "network output path; empty disables saving")
-	flag.StringVar(&options.saveWeightsPath, "save-weights", "data/mnist-weights.goml", "weights output path; empty disables saving")
-	flag.StringVar(&options.loadModelPath, "load-model", "", "restore architecture and weights from a network checkpoint")
-	flag.StringVar(&options.loadWeightsPath, "load-weights", "", "restore weights into the selected -model architecture")
+	flag.IntVar(&options.batch, "batch", 32, "maximum batch size")
+	flag.Uint64Var(&options.seed, "seed", 42, "deterministic shuffle seed")
+	flag.BoolVar(&options.shuffle, "shuffle", true, "shuffle training samples each epoch")
+	flag.BoolVar(&options.evaluate, "evaluate", false, "evaluate the local held-out test split after each epoch")
+	flag.StringVar(&options.saveModelPath, "save-model", "archive/mnist-model.goml", "network output path; empty disables saving")
+	flag.StringVar(&options.saveWeightsPath, "save-weights", "archive/mnist-weights.goml", "weights output path; empty disables saving")
+	flag.StringVar(&options.loadModelPath, "load-model", "", "restore architecture and weights")
+	flag.StringVar(&options.loadWeightsPath, "load-weights", "", "restore weights into the selected architecture")
 	flag.BoolVar(&options.predict, "predict", false, "evaluate a loaded checkpoint without training or saving")
-
 	flag.Parse()
 
-	if err := run(options); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	if err := runContext(ctx, options); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func load(path string, headerWords int) ([]uint32, []byte, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer func() { _ = file.Close() }()
-
-	reader, err := gzip.NewReader(file)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer func() { _ = reader.Close() }()
-
-	header := make([]uint32, headerWords)
-	if err := binary.Read(reader, binary.BigEndian, header); err != nil {
-		return nil, nil, err
-	}
-
-	if header[1] == 0 || header[1] > 60000 {
-		return nil, nil, fmt.Errorf("mnist: invalid item count %d", header[1])
-	}
-
-	size := int(header[1])
-
-	if headerWords == 4 {
-		if header[0] != 2051 || header[2] != 28 || header[3] != 28 {
-			return nil, nil, fmt.Errorf("mnist: expected image magic 2051 and 28x28 dimensions, got %v", header)
-		}
-
-		size *= 784
-	} else if header[0] != 2049 {
-		return nil, nil, fmt.Errorf("mnist: expected label magic 2049, got %d", header[0])
-	}
-
-	data, err := io.ReadAll(io.LimitReader(reader, int64(size)+1))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(data) != size {
-		return nil, nil, fmt.Errorf("mnist: expected %d bytes, got %d", size, len(data))
-	}
-
-	return header, data, nil
+func run(options runOptions) error {
+	return runContext(context.Background(), options)
 }
 
-func run(options runOptions) error {
+func runContext(ctx context.Context, options runOptions) error {
 	if options.limit <= 0 || options.batch <= 0 || (!options.predict && options.epochs <= 0) {
 		return fmt.Errorf("mnist: limit, batch, and training epochs must be positive")
 	}
@@ -144,109 +109,107 @@ func run(options runOptions) error {
 		return err
 	}
 
+	defer func() {
+		for _, parameter := range model.Parameters() {
+			parameter.ZeroGrad()
+			_ = parameter.Value().Data().Close()
+		}
+	}()
+
 	if options.loadWeightsPath != "" {
 		if err := checkpoint.LoadWeights(options.loadWeightsPath, model.Parameters()); err != nil {
 			return err
 		}
 	}
 
-	header, pixels, err := load(options.imagesPath, 4)
+	device, err := openDevice(options.device)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = device.Close() }()
+
+	if err := nn.ToDevice(model.Parameters(), device); err != nil {
+		return err
+	}
+
+	dataset, err := selectedDataset(ctx, options)
 	if err != nil {
 		return err
 	}
 
-	labelHeader, labels, err := load(options.labelsPath, 2)
-	if err != nil {
-		return err
-	}
-
-	if header[1] != labelHeader[1] || options.limit > int(header[1]) {
-		return fmt.Errorf("mnist: image/label counts must match and contain at least %d examples", options.limit)
-	}
-
-	values := make([]float32, options.limit*784)
-	targets := make([]int, options.limit)
-
-	for i := range values {
-		values[i] = float32(pixels[i]) / 255
-	}
-
-	for i := range targets {
-		if labels[i] >= 10 {
-			return fmt.Errorf("mnist: invalid class %d", labels[i])
-		}
-
-		targets[i] = int(labels[i])
-	}
-
-	data, err := tensor.From(values, options.limit, 1, 28, 28)
+	loader, err := data.NewLoader(dataset, data.CollateClassification, data.LoaderOptions{BatchSize: options.batch, Shuffle: !options.predict && options.shuffle, Seed: options.seed})
 	if err != nil {
 		return err
 	}
 
 	if options.predict {
-		correct, meanLoss, err := predict(model, data, targets, options.batch)
+		correct, meanLoss, err := predict(ctx, model, loader, device)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("examples=%d accuracy=%.2f%% mean_cross_entropy=%.4f\n", options.limit, 100*float64(correct)/float64(options.limit), meanLoss)
+		fmt.Printf("examples=%d accuracy=%.2f%% mean_cross_entropy=%.4f\n", dataset.Len(), 100*float64(correct)/float64(dataset.Len()), meanLoss)
 
 		return nil
+	}
+
+	var (
+		evaluation      *data.Loader[data.ClassificationSample, *data.ClassificationBatch]
+		evaluationCount int
+	)
+
+	if options.evaluate {
+		testOptions := options
+		testOptions.imagesPath, testOptions.labelsPath, testOptions.split = "", "", "test"
+		testOptions.limit = min(options.limit, 10000)
+
+		test, err := selectedDataset(ctx, testOptions)
+		if err != nil {
+			return err
+		}
+
+		evaluationCount = test.Len()
+
+		evaluation, err = data.NewLoader(test, data.CollateClassification, data.LoaderOptions{BatchSize: options.batch})
+		if err != nil {
+			return err
+		}
 	}
 
 	opt, err := optimizer.NewAdam(model.Parameters(), 0.001, 0.9, 0.999, 1e-8)
 	if err != nil {
 		return err
 	}
+	defer func() { _ = opt.Close() }()
 
-	var criterion loss.Loss[[]int] = loss.NewCrossEntropy()
-
-	for epoch := 0; epoch < options.epochs; epoch++ {
+	for epoch := range options.epochs {
 		var total float32
 
-		for start := 0; start < options.limit; start += options.batch {
-			end := min(start+options.batch, options.limit)
-
-			slice, err := data.Slice(0, start, end)
+		for batch, err := range loader.Batches(ctx, epoch) {
 			if err != nil {
 				return err
 			}
 
-			input, err := nn.NewValue(slice, false)
-			if err != nil {
+			value, trainErr := trainBatch(model, opt, batch, device)
+
+			closeErr := batch.Close()
+			if err := errors.Join(trainErr, closeErr); err != nil {
 				return err
 			}
 
-			prediction, err := model.Forward(input)
-			if err != nil {
-				return err
-			}
-
-			objective, err := criterion.Forward(prediction, targets[start:end])
-			if err != nil {
-				return err
-			}
-
-			lossValue1, err := objective.Data().At()
-			if err != nil {
-				return err
-			}
-
-			total += lossValue1 * float32(end-start)
-
-			if err := objective.Backward(); err != nil {
-				return err
-			}
-
-			if err := opt.Step(); err != nil {
-				return err
-			}
-
-			opt.ZeroGrad()
+			total += value * float32(len(batch.Labels))
 		}
 
-		fmt.Printf("epoch=%d mean_cross_entropy=%.4f\n", epoch+1, total/float32(options.limit))
+		fmt.Printf("epoch=%d mean_cross_entropy=%.4f\n", epoch+1, total/float32(dataset.Len()))
+
+		if evaluation != nil {
+			correct, meanLoss, err := predict(ctx, model, evaluation, device)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("test_examples=%d test_accuracy=%.2f%% test_cross_entropy=%.4f\n", evaluationCount, 100*float64(correct)/float64(evaluationCount), meanLoss)
+		}
 	}
 
 	if options.saveModelPath != "" {
@@ -266,4 +229,95 @@ func run(options runOptions) error {
 	}
 
 	return nil
+}
+
+func selectedDataset(ctx context.Context, options runOptions) (data.Dataset[data.ClassificationSample], error) {
+	var (
+		dataset *mnist.Dataset
+		err     error
+	)
+
+	if options.imagesPath != "" || options.labelsPath != "" {
+		if options.imagesPath == "" || options.labelsPath == "" {
+			return nil, fmt.Errorf("mnist: provide both images and labels")
+		}
+
+		dataset, err = mnist.OpenFiles(ctx, options.imagesPath, options.labelsPath)
+	} else {
+		split := mnist.Train
+		switch options.split {
+		case "", "train":
+		case "test":
+			split = mnist.Test
+		default:
+			return nil, fmt.Errorf("mnist: split must be train or test")
+		}
+
+		directory := options.directory
+		if directory == "" {
+			directory = "archive"
+		}
+
+		dataset, err = mnist.OpenContext(ctx, directory, split)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	if options.limit > dataset.Len() {
+		return nil, fmt.Errorf("mnist: limit %d exceeds %d available examples", options.limit, dataset.Len())
+	}
+
+	indices := make([]int, options.limit)
+	for i := range indices {
+		indices[i] = i
+	}
+
+	return data.Subset[data.ClassificationSample](dataset, indices)
+}
+
+func trainBatch(model *layer.Sequential, opt *optimizer.Adam, batch *data.ClassificationBatch, device backend.Device) (float32, error) {
+	scope, err := tensor.NewScope(device)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = scope.Close() }()
+
+	images, err := scope.To(batch.Inputs)
+	if err != nil {
+		return 0, err
+	}
+
+	input, err := nn.NewValue(images, false)
+	if err != nil {
+		return 0, err
+	}
+
+	prediction, err := model.Forward(input)
+	if err != nil {
+		return 0, err
+	}
+
+	objective, err := loss.NewCrossEntropy().Forward(prediction, batch.Labels)
+	if err != nil {
+		return 0, err
+	}
+
+	values, err := objective.Data().HostData()
+	if err != nil {
+		return 0, err
+	}
+
+	if err := objective.Backward(); err != nil {
+		return 0, err
+	}
+
+	if err := opt.Step(); err != nil {
+		return 0, err
+	}
+
+	opt.ZeroGrad()
+
+	return values[0], nil
 }
