@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="metrics">
+  <title>metrics</title>
+  <desc>Three numerical columns compare prediction quality.</desc>
+  <g stroke-width="3" stroke-linejoin="round">
+    <path d="m12 58 10 6v22l-10-6Z" fill="#087e9c" stroke="#12b8d0"/>
+    <path d="m22 64 10-6v22l-10 6Z" fill="#123b60" stroke="#267ba3"/>
+    <path d="m12 58 10-6 10 6-10 6Z" fill="#38d9e8" stroke="#38d9e8"/>
+    <path d="m38 36 10 6v44l-10-6Z" fill="#087e9c" stroke="#12b8d0"/>
+    <path d="m48 42 10-6v44l-10 6Z" fill="#123b60" stroke="#267ba3"/>
+    <path d="m38 36 10-6 10 6-10 6Z" fill="#38d9e8" stroke="#38d9e8"/>
+    <path d="m64 14 10 6v66l-10-6Z" fill="#087e9c" stroke="#12b8d0"/>
+    <path d="m74 20 10-6v66l-10 6Z" fill="#123b60" stroke="#267ba3"/>
+    <path d="m64 14 10-6 10 6-10 6Z" fill="#38d9e8" stroke="#38d9e8"/>
+  </g>
+</svg>

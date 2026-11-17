@@ -790,3 +790,40 @@ description = "Verify the application after its data dependency is published"
 dir = "nn/examples/mnist"
 env = { GOWORK = "off" }
 run = "go test ./..."
+
+[tasks."build:metrics"]
+dir = "metrics"
+run = "go build ./..."
+
+[tasks."test:metrics"]
+dir = "metrics"
+run = "go test ./..."
+
+[tasks."fmt:metrics"]
+dir = "metrics"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."lint:metrics"]
+dir = "metrics"
+run = "golangci-lint run ./..."
+
+[tasks."test:standalone:metrics"]
+dir = "metrics"
+env = { GOWORK = "off" }
+run = "go test ./..."
+
+[tasks."bench:metrics"]
+dir = "metrics"
+run = "go test -run '^$' -bench=. -benchmem -benchtime=200ms -count=3 ./..."
+
+[tasks."example:metrics"]
+run = [{ task = "example:metrics:classification" }, { task = "example:metrics:regression" }, { task = "example:metrics:custom" }]
+
+[tasks."example:metrics:classification"]
+run = "go run ./metrics/examples/classification"
+
+[tasks."example:metrics:regression"]
+run = "go run ./metrics/examples/regression"
+
+[tasks."example:metrics:custom"]
+run = "go run ./metrics/examples/custom"

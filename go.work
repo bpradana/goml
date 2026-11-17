@@ -7,6 +7,7 @@ use (
 	./contrib/backend/webgpu/examples
 	./contrib/nn/yolo
 	./data
+	./metrics
 	./nn
 	./nn/examples/mnist
 	./simdops

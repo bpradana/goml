@@ -6,6 +6,7 @@ on:
       - "simdops/v*"
       - "tensor/v*"
       - "data/v*"
+      - "metrics/v*"
       - "nn/v*"
       - "contrib/nn/yolo/v*"
       - "contrib/backend/metal/v*"
@@ -46,7 +47,7 @@ jobs:
         with:
           script: |
             const tag = process.env.RELEASE_TAG;
-            const match = /^(simdops|tensor|data|nn|contrib\/nn\/yolo|contrib\/backend\/(?:metal|webgpu))\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
+            const match = /^(simdops|tensor|data|metrics|nn|contrib\/nn\/yolo|contrib\/backend\/(?:metal|webgpu))\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(tag);
             if (!match || Number(match[2]) > 1) {
               throw new Error('Expected a module tag such as nn/v0.4.0; current module paths support v0 and v1.');
             }
