@@ -6,7 +6,9 @@ use (
 	./contrib/backend/webgpu
 	./contrib/backend/webgpu/examples
 	./contrib/nn/yolo
+	./data
 	./nn
+	./nn/examples/mnist
 	./simdops
 	./tensor
 )
