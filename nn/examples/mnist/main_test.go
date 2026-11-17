@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/binary"
+	"math"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
@@ -13,8 +14,14 @@ import (
 
 	"github.com/bpradana/goml/tensor/backendtest"
 
+	"github.com/bpradana/goml/data"
+	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/checkpoint"
+	"github.com/bpradana/goml/nn/layer"
+	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
+	"github.com/bpradana/goml/tensor/backend"
+	"github.com/bpradana/goml/trainer"
 )
 
 func writeIDX(t testing.TB, header []uint32, data []byte) string {
@@ -168,6 +175,12 @@ func TestRun_RejectsConflictingCheckpointOptions(t *testing.T) {
 		{limit: 1, epochs: 1, batch: 1, loadModelPath: "model", loadWeightsPath: "weights"},
 		{limit: 1, batch: 1, predict: true},
 		{limit: 1, epochs: 1, batch: 1, saveModelPath: "same", saveWeightsPath: "./same"},
+		{limit: 1, epochs: 1, batch: 1, evaluate: true, bestModelPath: "same", saveModelPath: "./same"},
+		{limit: 1, epochs: 1, batch: 1, evaluate: true, bestModelPath: "same", saveWeightsPath: "./same"},
+		{limit: 1, epochs: 1, batch: 1, bestModelPath: "best"},
+		{limit: 1, epochs: 1, batch: 1, patience: 1},
+		{limit: 1, epochs: 1, batch: 1, patience: -1},
+		{limit: 1, epochs: 1, batch: 1, minDelta: -1},
 	} {
 		if err := run(options); err == nil {
 			t.Fatal("accepted conflicting checkpoint options")
@@ -215,5 +228,168 @@ func BenchmarkTrainingEndToEnd(b *testing.B) {
 		if err := run(options); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestTrainer_CPUParityAndConvergence(t *testing.T) {
+	checkTrainerDevice(t, tensor.CPU(), func() (uint64, uint64) { return 0, 0 })
+}
+
+func checkTrainerDevice(t *testing.T, device backend.Device, memory func() (uint64, uint64)) {
+	t.Helper()
+
+	for _, task := range []string{"classification", "regression"} {
+		t.Run(task, func(t *testing.T) {
+			outputs := 1
+			if task == "classification" {
+				outputs = 2
+			}
+
+			makeModel := func() *layer.Sequential {
+				dense, err := layer.NewDense(1, outputs, true, rand.New(rand.NewPCG(1, 2)))
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				model, err := layer.NewSequential(dense)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				return model
+			}
+
+			cpu, gpu := makeModel(), makeModel()
+			defer func() {
+				for _, model := range []*layer.Sequential{cpu, gpu} {
+					for _, p := range model.Parameters() {
+						p.ZeroGrad()
+						_ = p.Value().Data().Close()
+					}
+				}
+			}()
+
+			if err := nn.ToDevice(gpu.Parameters(), device); err != nil {
+				t.Fatal(err)
+			}
+
+			input, err := tensor.From([]float32{-2, -1, 1, 2}, 4, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			defer func() { _ = input.Close() }()
+
+			var baseline uint64
+
+			callback := func(report trainer.EpochReport) error {
+				if err := device.Synchronize(); err != nil {
+					return err
+				}
+
+				live, _ := memory()
+				if report.Epoch == 1 {
+					baseline = live
+				} else if live != baseline {
+					t.Fatalf("resident storage grew: baseline=%d current=%d epoch=%d", baseline, live, report.Epoch)
+				}
+
+				return nil
+			}
+
+			var expected, actual trainer.History
+
+			if task == "classification" {
+				dataset, err := data.NewClassificationDataset(input, []int{0, 0, 1, 1})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				loader, err := data.NewLoader(dataset, data.CollateClassification, data.LoaderOptions{BatchSize: 3, Shuffle: true, Seed: 42})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				co, _ := optimizer.NewSGD(cpu.Parameters(), 0.1)
+				go_, _ := optimizer.NewSGD(gpu.Parameters(), 0.1)
+				cr, _ := trainer.NewClassifier(cpu, co, tensor.CPU(), 2)
+				gr, _ := trainer.NewClassifier(gpu, go_, device, 2)
+
+				expected, err = cr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 20})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				actual, err = gr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 20, OnEpochEnd: callback})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if actual.Epochs[19].Classification.Accuracy != 1 {
+					t.Fatal("GPU classifier did not learn")
+				}
+			} else {
+				targets, err := tensor.From([]float32{-3, -1, 3, 5}, 4, 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = targets.Close() }()
+
+				dataset, err := data.NewRegressionDataset(input, targets)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				loader, err := data.NewLoader(dataset, data.CollateRegression, data.LoaderOptions{BatchSize: 3})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				co, _ := optimizer.NewAdam(cpu.Parameters(), 0.05, 0.9, 0.999, 1e-8)
+				go_, _ := optimizer.NewAdam(gpu.Parameters(), 0.05, 0.9, 0.999, 1e-8)
+
+				defer func() { _ = co.Close(); _ = go_.Close() }()
+
+				cr, _ := trainer.NewRegressor(cpu, co, tensor.CPU())
+				gr, _ := trainer.NewRegressor(gpu, go_, device)
+
+				expected, err = cr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 100})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				actual, err = gr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 100, OnEpochEnd: callback})
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if actual.Epochs[99].Regression.MSE > 0.001 {
+					t.Fatal("GPU regressor did not learn")
+				}
+			}
+
+			for epoch := range actual.Epochs {
+				if math.Abs(actual.Epochs[epoch].Validation.MeanLoss-expected.Epochs[epoch].Validation.MeanLoss) > 0.001 {
+					t.Fatalf("validation parity at epoch %d: GPU=%g CPU=%g", epoch, actual.Epochs[epoch].Validation.MeanLoss, expected.Epochs[epoch].Validation.MeanLoss)
+				}
+			}
+
+			for _, p := range gpu.Parameters() {
+				if p.Value().Data().Device().ID() != device.ID() || p.Value().Grad() != nil {
+					t.Fatal("parameter moved or gradient retained")
+				}
+			}
+
+			_, peak := memory()
+			t.Logf("%s: stable device bytes=%d peak=%d validation loss=%g", task, baseline, peak, actual.Epochs[len(actual.Epochs)-1].Validation.MeanLoss)
+		})
+	}
+
+	if err := device.Synchronize(); err != nil {
+		t.Fatal(err)
+	}
+
+	if live, _ := memory(); live != 0 {
+		t.Fatalf("model/optimizer cleanup left %d bytes", live)
 	}
 }

@@ -3,12 +3,16 @@
 package main
 
 import (
+	"context"
 	"math/rand/v2"
 	"testing"
+
+	"github.com/bpradana/goml/contrib/backend/metal"
 
 	"github.com/bpradana/goml/data"
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/optimizer"
+	"github.com/bpradana/goml/trainer"
 )
 
 func TestDevice_MetalBatchesOutliveCPUCleanupAndTrainBothModels(t *testing.T) {
@@ -62,7 +66,22 @@ func TestDevice_MetalBatchesOutliveCPUCleanupAndTrainBothModels(t *testing.T) {
 			}
 			defer func() { _ = opt.Close() }()
 
-			if _, err := trainBatch(model, opt, batch, device); err != nil {
+			dataset, err := data.NewClassificationDataset(batch.Inputs, batch.Labels)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			loader, err := data.NewLoader(dataset, data.CollateClassification, data.LoaderOptions{BatchSize: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			runner, err := trainer.NewClassifier(model, opt, device, 10)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := runner.Fit(context.Background(), loader, nil, trainer.FitOptions{Epochs: 1}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -109,4 +128,14 @@ func BenchmarkBatchPreparation_MetalTransferInclusive(b *testing.B) {
 
 		_ = gpu.Close()
 	}
+}
+
+func TestTrainer_MetalParityConvergenceAndStableMemory(t *testing.T) {
+	device, err := metal.Open()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = device.Close() }()
+
+	checkTrainerDevice(t, device, func() (uint64, uint64) { stats := device.Stats(); return stats.LiveBytes, stats.PeakBytes })
 }

@@ -1,5 +1,3 @@
-//go:build !metal
-
 package main
 
 import (
@@ -10,9 +8,14 @@ import (
 )
 
 func openDevice(name string) (backend.Device, error) {
-	if name == "" || name == "cpu" {
+	switch name {
+	case "", "cpu":
 		return tensor.CPU(), nil
+	case "metal":
+		return openMetalDevice()
+	case "webgpu":
+		return openWebGPUDevice()
+	default:
+		return nil, fmt.Errorf("mnist: unknown device %q", name)
 	}
-
-	return nil, fmt.Errorf("mnist: unsupported device %q; Metal requires -tags metal and supported macOS hardware", name)
 }

@@ -1,0 +1,10 @@
+github.com/bpradana/goml/data v0.1.0 h1:PNQDAKjeKwKJf2XQhI7ZG6VjTXV7J6uJIi+jMFw7AtY=
+github.com/bpradana/goml/data v0.1.0/go.mod h1:9KoDz2xv2Wlj2x6L2uUhywLtJVSBODCBWw1DX1iXVug=
+github.com/bpradana/goml/metrics v0.1.0 h1:Fkxw8JCre3jL9jiKxI6E1qYDRfLuRffwAxmrgAs7w/M=
+github.com/bpradana/goml/metrics v0.1.0/go.mod h1:HhI92ACnmSy4MUBrx0kn+RFdqG5yoKv4MUEaQk7jisU=
+github.com/bpradana/goml/nn v0.6.0 h1:cGtzHR8Tn0leqe6RFExwWNB5hy0DwcQf6oszLC70TZo=
+github.com/bpradana/goml/nn v0.6.0/go.mod h1:8MatLrUzKzj+Qn4F8kK+KR3z74iW+TdmidA+Ry20oB0=
+github.com/bpradana/goml/simdops v0.1.0 h1:6gT4CNdwe8d5J6vTj8DMzNhTw7z2hSHKXyNie5k5/CI=
+github.com/bpradana/goml/simdops v0.1.0/go.mod h1:T1Oe8XNwcKOWs1CJe/AUu4nqt+MoukE13BPJyJGy7PA=
+github.com/bpradana/goml/tensor v0.3.0 h1:0ZoCJKqkdODxOtWDLCo6LG/8fBSb5OoWiaYQgIytdy8=
+github.com/bpradana/goml/tensor v0.3.0/go.mod h1:mQtjruLHQrdRMJpJgpC0lMvlPk7DL1VTR9Xr1mhgMWo=

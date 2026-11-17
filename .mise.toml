@@ -18,6 +18,8 @@ run = [
   { task = "build:nn" },
   { task = "build:yolo" },
   { task = "build:data" },
+  { task = "build:metrics" },
+  { task = "build:trainer" },
   { task = "build:mnist" }
 ]
 
@@ -39,10 +41,10 @@ run = "go build ./..."
 [tasks."build:portable"]
 description = "Cross-compile Linux amd64 and arm64 without CGo, with and without SIMD"
 run = [
-  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/...",
-  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/..."
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/...",
+  "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOEXPERIMENT=simd go build ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
 ]
 
 [tasks."test"]
@@ -53,6 +55,8 @@ run = [
   { task = "test:nn" },
   { task = "test:yolo" },
   { task = "test:data" },
+  { task = "test:metrics" },
+  { task = "test:trainer" },
   { task = "test:mnist" }
 ]
 
@@ -79,6 +83,8 @@ run = [
   { task = "lint:nn" },
   { task = "lint:yolo" },
   { task = "lint:data" },
+  { task = "lint:metrics" },
+  { task = "lint:trainer" },
   { task = "lint:mnist" }
 ]
 
@@ -104,7 +110,9 @@ run = [
   { task = "bench:tensor" },
   { task = "bench:nn" },
   { task = "bench:yolo" },
-  { task = "bench:data" }
+  { task = "bench:data" },
+  { task = "bench:metrics" },
+  { task = "bench:trainer" }
 ]
 
 [tasks."bench:simdops"]
@@ -157,6 +165,8 @@ run = [
   { task = "fmt:nn" },
   { task = "fmt:yolo" },
   { task = "fmt:data" },
+  { task = "fmt:metrics" },
+  { task = "fmt:trainer" },
   { task = "fmt:mnist" }
 ]
 
@@ -177,7 +187,7 @@ run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix 
 
 [tasks."fmt:check"]
 description = "Check Go formatting"
-run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
+run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
 
 [tasks."test:race"]
 description = "Run race detector"
@@ -185,7 +195,7 @@ run = [
   "go test -race ./simdops/...",
   "go test -race ./tensor/...",
   "go test -race ./nn/...",
-  "go test -race ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/..."
+  "go test -race ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
 ]
 
 [tasks."test:coverage"]
@@ -194,7 +204,7 @@ run = [
   "go test -cover ./simdops/...",
   "go test -cover ./tensor/...",
   "go test -cover ./nn/...",
-  "go test -cover ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/..."
+  "go test -cover ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
 ]
 
 [tasks."test:simd"]
@@ -204,7 +214,7 @@ run = [
   "go test ./simdops/...",
   "go test ./tensor/...",
   "go test ./nn/...",
-  "go test ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/..."
+  "go test ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
 ]
 
 [tasks."vet"]
@@ -213,7 +223,7 @@ run = [
   "go vet ./simdops/...",
   "go vet ./tensor/...",
   "go vet ./nn/...",
-  "go vet ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/..."
+  "go vet ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
 ]
 
 [tasks."security:vuln"]
@@ -224,7 +234,9 @@ run = [
   "cd nn && govulncheck ./...",
   "cd contrib/nn/yolo && govulncheck ./...",
   "cd data && govulncheck ./...",
-  "cd nn/examples/mnist && govulncheck ./..."
+  "cd nn/examples/mnist && govulncheck ./...",
+  "cd metrics && govulncheck ./...",
+  "cd trainer && govulncheck ./..."
 ]
 
 [tasks."test:standalone"]
@@ -234,7 +246,9 @@ run = [
   "cd simdops && go test ./...",
   "cd tensor && go test ./...",
   "cd nn && go test ./...",
-  "cd data && go test ./..."
+  "cd data && go test ./...",
+  "cd metrics && go test ./...",
+  "cd trainer && go test ./..."
 ]
 
 [tasks."test:fuzz"]
@@ -306,8 +320,8 @@ mkdir -p "$directory"
 } > "$directory/hardware.txt"
 git diff --binary > "$directory/source.diff"
 git ls-files --cached --others --exclude-standard -z | tar -czf "$directory/source.tar.gz" --null -T -
-go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/... > "$directory/scalar.txt"
-GOEXPERIMENT=simd go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./nn/examples/mnist/... > "$directory/simd.txt"
+go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/... > "$directory/scalar.txt"
+GOEXPERIMENT=simd go test -p=1 -run '^$' -bench=. -benchmem -benchtime=100ms -count=3 ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/... > "$directory/simd.txt"
 printf 'Recorded benchmarks in %s\n' "$directory"
 '''
 
@@ -318,7 +332,9 @@ run = [
   { task = "deps:tidy:tensor" },
   { task = "deps:tidy:nn" },
   { task = "deps:tidy:yolo" },
-  { task = "deps:tidy:data" }
+  { task = "deps:tidy:data" },
+  { task = "deps:tidy:metrics" },
+  { task = "deps:tidy:trainer" }
 ]
 
 [tasks."deps:tidy:simdops"]
@@ -342,6 +358,8 @@ run = [
   "go doc github.com/bpradana/goml/simdops",
   "go doc github.com/bpradana/goml/tensor",
   "go doc github.com/bpradana/goml/data",
+  "go doc github.com/bpradana/goml/metrics",
+  "go doc github.com/bpradana/goml/trainer",
   "go doc github.com/bpradana/goml/nn",
   "go doc github.com/bpradana/goml/nn/activation",
   "go doc github.com/bpradana/goml/nn/checkpoint",
@@ -362,7 +380,9 @@ run = [
   "cd tensor && go mod verify",
   "cd nn && go mod verify",
   "cd contrib/nn/yolo && go mod verify",
-  "cd data && go mod verify"
+  "cd data && go mod verify",
+  "cd metrics && go mod verify",
+  "cd trainer && go mod verify"
 ]
 
 [tasks."security:nancy"]
@@ -816,6 +836,35 @@ run = "go test ./..."
 dir = "metrics"
 run = "go test -run '^$' -bench=. -benchmem -benchtime=200ms -count=3 ./..."
 
+[tasks."build:trainer"]
+dir = "trainer"
+run = "go build ./..."
+
+[tasks."test:trainer"]
+dir = "trainer"
+run = "go test ./..."
+
+[tasks."fmt:trainer"]
+dir = "trainer"
+run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix ./..."]
+
+[tasks."lint:trainer"]
+dir = "trainer"
+run = "golangci-lint run ./..."
+
+[tasks."test:trainer:race"]
+dir = "trainer"
+run = "go test -race ./..."
+
+[tasks."test:standalone:trainer"]
+dir = "trainer"
+env = { GOWORK = "off" }
+run = "go test ./..."
+
+[tasks."bench:trainer"]
+dir = "trainer"
+run = "go test -run '^$' -bench=. -benchmem -benchtime=200ms -count=3 ./..."
+
 [tasks."example:metrics"]
 run = [{ task = "example:metrics:classification" }, { task = "example:metrics:regression" }, { task = "example:metrics:custom" }]
 
@@ -825,5 +874,64 @@ run = "go run ./metrics/examples/classification"
 [tasks."example:metrics:regression"]
 run = "go run ./metrics/examples/regression"
 
+[tasks."example:trainer"]
+run = [{ task = "example:trainer:classification" }, { task = "example:trainer:regression" }, { task = "example:trainer:custom" }]
+
+[tasks."example:trainer:classification"]
+run = "go run ./trainer/examples/classification"
+
+[tasks."example:trainer:regression"]
+run = "go run ./trainer/examples/regression"
+
+[tasks."example:trainer:custom"]
+run = "go run ./trainer/examples/custom"
+
+[tasks."test:trainer:metal"]
+dir = "nn/examples/mnist"
+run = "go test -tags metal -race ./..."
+
+[tasks."test:trainer:webgpu"]
+dir = "nn/examples/mnist"
+run = "go test -tags webgpu -race ./..."
+
+[tasks."example:trainer:mnist"]
+run = [{ task = "example:mnist" }]
+
+[tasks."example:trainer:mnist:metal"]
+run = "go run -tags metal ./nn/examples/mnist -device metal"
+
+[tasks."example:trainer:mnist:webgpu"]
+run = "go run -tags webgpu ./nn/examples/mnist -device webgpu"
+
+[tasks."lint:mnist:webgpu"]
+dir = "nn/examples/mnist"
+run = "golangci-lint run --build-tags webgpu ./..."
+
 [tasks."example:metrics:custom"]
 run = "go run ./metrics/examples/custom"
+
+[tasks."fmt:mnist:metal"]
+dir = "nn/examples/mnist"
+run = ["golangci-lint fmt ./...", "golangci-lint run --build-tags metal --enable-only wsl_v5 --fix ./..."]
+
+[tasks."fmt:mnist:webgpu"]
+dir = "nn/examples/mnist"
+run = ["golangci-lint fmt ./...", "golangci-lint run --build-tags webgpu --enable-only wsl_v5 --fix ./..."]
+
+[tasks."deps:tidy:metrics"]
+dir = "metrics"
+env = { GOWORK = "off" }
+run = "go mod tidy"
+
+[tasks."deps:tidy:trainer"]
+dir = "trainer"
+env = { GOWORK = "off" }
+run = "go mod tidy"
+
+[tasks."build:trainer:portable"]
+env = { CGO_ENABLED = "0" }
+run = [
+  "GOOS=linux GOARCH=amd64 go build ./metrics/... ./trainer/...",
+  "GOOS=linux GOARCH=arm64 go build ./metrics/... ./trainer/...",
+  "GOOS=windows GOARCH=amd64 go build ./metrics/... ./trainer/..."
+]

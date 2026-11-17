@@ -3,10 +3,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand/v2"
 	"os"
 	"os/signal"
@@ -17,10 +17,8 @@ import (
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/nn/layer"
-	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/nn/optimizer"
-	"github.com/bpradana/goml/tensor"
-	"github.com/bpradana/goml/tensor/backend"
+	"github.com/bpradana/goml/trainer"
 )
 
 type runOptions struct {
@@ -31,6 +29,9 @@ type runOptions struct {
 	shuffle, evaluate                                              bool
 	saveModelPath, saveWeightsPath, loadModelPath, loadWeightsPath string
 	predict                                                        bool
+	bestModelPath                                                  string
+	patience                                                       int
+	minDelta                                                       float64
 }
 
 func main() {
@@ -39,7 +40,7 @@ func main() {
 	flag.StringVar(&options.labelsPath, "labels", "", "optional explicit local label IDX file, plain or .gz")
 	flag.StringVar(&options.directory, "data", "archive", "local MNIST directory")
 	flag.StringVar(&options.split, "split", "train", "dataset split: train or test")
-	flag.StringVar(&options.device, "device", "cpu", "cpu, or metal with the metal build tag")
+	flag.StringVar(&options.device, "device", "cpu", "cpu, metal (-tags metal), or webgpu (-tags webgpu)")
 	flag.StringVar(&options.modelName, "model", "dense", "dense or cnn; ignored with -load-model")
 	flag.IntVar(&options.limit, "limit", 1000, "number of selected examples")
 	flag.IntVar(&options.epochs, "epochs", 3, "training epochs")
@@ -52,6 +53,9 @@ func main() {
 	flag.StringVar(&options.loadModelPath, "load-model", "", "restore architecture and weights")
 	flag.StringVar(&options.loadWeightsPath, "load-weights", "", "restore weights into the selected architecture")
 	flag.BoolVar(&options.predict, "predict", false, "evaluate a loaded checkpoint without training or saving")
+	flag.StringVar(&options.bestModelPath, "best-model", "", "optional best validation model checkpoint")
+	flag.IntVar(&options.patience, "patience", 0, "validation-loss early stopping patience; zero disables")
+	flag.Float64Var(&options.minDelta, "min-delta", 0, "strict validation loss improvement for early stopping")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
@@ -79,19 +83,34 @@ func runContext(ctx context.Context, options runOptions) error {
 		return fmt.Errorf("mnist: predict requires load-model or load-weights")
 	}
 
-	if !options.predict && options.saveModelPath != "" && options.saveWeightsPath != "" {
-		modelPath, err := filepath.Abs(options.saveModelPath)
-		if err != nil {
-			return err
+	if options.patience < 0 || options.minDelta < 0 || math.IsNaN(options.minDelta) || math.IsInf(options.minDelta, 0) {
+		return fmt.Errorf("mnist: patience and finite min-delta must be nonnegative")
+	}
+
+	if !options.predict {
+		if (options.patience > 0 || options.bestModelPath != "") && !options.evaluate {
+			return fmt.Errorf("mnist: patience and best-model require held-out evaluation")
 		}
 
-		weightsPath, err := filepath.Abs(options.saveWeightsPath)
-		if err != nil {
-			return err
-		}
+		var outputs []string
 
-		if modelPath == weightsPath {
-			return fmt.Errorf("mnist: model and weights need different output paths")
+		for _, path := range []string{options.saveModelPath, options.saveWeightsPath, options.bestModelPath} {
+			if path == "" {
+				continue
+			}
+
+			absolute, err := filepath.Abs(path)
+			if err != nil {
+				return err
+			}
+
+			for _, previous := range outputs {
+				if previous == absolute {
+					return fmt.Errorf("mnist: final model, weights, and best model need different output paths")
+				}
+			}
+
+			outputs = append(outputs, absolute)
 		}
 	}
 
@@ -154,7 +173,7 @@ func runContext(ctx context.Context, options runOptions) error {
 	}
 
 	var (
-		evaluation      *data.Loader[data.ClassificationSample, *data.ClassificationBatch]
+		evaluation      trainer.BatchSource[*data.ClassificationBatch]
 		evaluationCount int
 	)
 
@@ -182,34 +201,26 @@ func runContext(ctx context.Context, options runOptions) error {
 	}
 	defer func() { _ = opt.Close() }()
 
-	for epoch := range options.epochs {
-		var total float32
+	runner, err := trainer.NewClassifier(model, opt, device, 10)
+	if err != nil {
+		return err
+	}
 
-		for batch, err := range loader.Batches(ctx, epoch) {
-			if err != nil {
-				return err
-			}
+	fitOptions := trainer.FitOptions{Epochs: options.epochs, BestCheckpointPath: options.bestModelPath, OnEpochEnd: func(report trainer.EpochReport) error {
+		fmt.Printf("epoch=%d mean_cross_entropy=%.4f\n", report.Epoch, report.Train.MeanLoss)
 
-			value, trainErr := trainBatch(model, opt, batch, device)
-
-			closeErr := batch.Close()
-			if err := errors.Join(trainErr, closeErr); err != nil {
-				return err
-			}
-
-			total += value * float32(len(batch.Labels))
+		if report.Validation != nil {
+			fmt.Printf("test_examples=%d test_accuracy=%.2f%% test_cross_entropy=%.4f\n", evaluationCount, 100*report.Classification.Accuracy, report.Validation.MeanLoss)
 		}
 
-		fmt.Printf("epoch=%d mean_cross_entropy=%.4f\n", epoch+1, total/float32(dataset.Len()))
+		return nil
+	}}
+	if options.patience != 0 {
+		fitOptions.EarlyStopping = &trainer.EarlyStopping{Patience: options.patience, MinDelta: options.minDelta}
+	}
 
-		if evaluation != nil {
-			correct, meanLoss, err := predict(ctx, model, evaluation, device)
-			if err != nil {
-				return err
-			}
-
-			fmt.Printf("test_examples=%d test_accuracy=%.2f%% test_cross_entropy=%.4f\n", evaluationCount, 100*float64(correct)/float64(evaluationCount), meanLoss)
-		}
+	if _, err := runner.Fit(ctx, loader, evaluation, fitOptions); err != nil {
+		return err
 	}
 
 	if options.saveModelPath != "" {
@@ -275,49 +286,4 @@ func selectedDataset(ctx context.Context, options runOptions) (data.Dataset[data
 	}
 
 	return data.Subset[data.ClassificationSample](dataset, indices)
-}
-
-func trainBatch(model *layer.Sequential, opt *optimizer.Adam, batch *data.ClassificationBatch, device backend.Device) (float32, error) {
-	scope, err := tensor.NewScope(device)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = scope.Close() }()
-
-	images, err := scope.To(batch.Inputs)
-	if err != nil {
-		return 0, err
-	}
-
-	input, err := nn.NewValue(images, false)
-	if err != nil {
-		return 0, err
-	}
-
-	prediction, err := model.Forward(input)
-	if err != nil {
-		return 0, err
-	}
-
-	objective, err := loss.NewCrossEntropy().Forward(prediction, batch.Labels)
-	if err != nil {
-		return 0, err
-	}
-
-	values, err := objective.Data().HostData()
-	if err != nil {
-		return 0, err
-	}
-
-	if err := objective.Backward(); err != nil {
-		return 0, err
-	}
-
-	if err := opt.Step(); err != nil {
-		return 0, err
-	}
-
-	opt.ZeroGrad()
-
-	return values[0], nil
 }

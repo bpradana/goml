@@ -12,4 +12,5 @@ use (
 	./nn/examples/mnist
 	./simdops
 	./tensor
+	./trainer
 )
