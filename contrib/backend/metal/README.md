@@ -63,34 +63,34 @@ The core sequence is:
 ```go
 device, err := metal.Open()
 if err != nil {
-    return err
+	return err
 }
 defer func() { _ = device.Close() }()
 
 scope, err := tensor.NewScope(device)
 if err != nil {
-    return err
+	return err
 }
 defer func() { _ = scope.Close() }()
 
 a, err := scope.To(left)
 if err != nil {
-    return err
+	return err
 }
 
 b, err := scope.To(right)
 if err != nil {
-    return err
+	return err
 }
 
 result, err := tensor.MatMul(a, b)
 if err != nil {
-    return err
+	return err
 }
 
 values, err := result.HostData()
 if err != nil {
-    return err
+	return err
 }
 ```
 
@@ -119,13 +119,19 @@ Float32 results can differ from CPU references because reduction and multiplicat
 
 ```mermaid
 flowchart LR
-    Models["nn and YOLO models"] --> Tensor["Tensor-owned device contracts"]
-    Metal["Independent Metal module"] --> Tensor
+    Models["nn and YOLO models"] --> Tensor["Tensor validation and ownership"]
+    Tensor --> Contract["tensor/backend capabilities"]
+    Metal["Independent Metal module"] --> Contract
     Metal --> Queue["One ordered queue per device instance"]
     Queue --> MPS["Cached MPS and MPSGraph operations"]
     Queue --> Shaders["Cached embedded shader pipelines"]
     Tensor --> Download["Explicit HostData or ToCPU"]
 ```
+
+Metal implements the typed optional capabilities in `tensor/backend`. Its
+production Go package imports those contracts without importing Tensor or
+NeuralNet. Arithmetic, MatMul, reductions, layout, convolution, and spatial
+operations have separate source files and matching tests.
 
 Open compiles the embedded shader library once and caches compute pipelines.
 Every device instance owns its queue, caches, and allocation registry.
@@ -157,8 +163,8 @@ Explicit cleanup waits for concurrent Go cleanup callbacks to finish releasing r
 Go cleanup callbacks are a safety net for abandoned values.
 They do not replace scopes, tensor Close, optimizer Close, or device Close.
 
-Data and Contiguous remain CPU-only APIs and panic for GPU inputs.
-Use fallible HostData, ToCPU, and MakeContiguous instead.
+HostData and ToCPU explicitly read host values. MakeContiguous materializes
+independent storage on the current device; Retain shares immutable storage.
 At returns an error for GPU storage. String displays metadata without downloading values.
 See the [migration and ownership guide](../../../docs/gpu.md).
 
@@ -180,7 +186,7 @@ It downloads final output heads for CPU postprocessing. No model or dataset is d
 mise run fmt:check:metal
 mise run lint:gpu:metal
 mise run lint:gpu:examples
-mise run test:gpu:metal
+mise run test:backend:metal
 mise run test:gpu:parity
 mise run test:gpu:race
 mise run bench:gpu:metal
@@ -205,6 +211,9 @@ Release Metal only after its tensor dependency resolves with GOWORK=off and nati
 The examples module is validated through go.work and has no release target.
 CUDA and ROCm remain unimplemented source reservations.
 
+- [Backend contract](../../../docs/backend-contract.md).
+- [Contributor tutorial](../../../docs/extending-backends.md).
+- [API migration](../../../docs/backend-migration.md).
 - [GPU architecture, migration, and phase evidence](../../../docs/gpu.md).
 - [Performance report](../../../docs/performance/metal.md).
 - [Release procedure](../../../docs/releasing.md).

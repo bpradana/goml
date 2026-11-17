@@ -54,6 +54,8 @@ It does not discover hardware, allocate GPU memory, execute kernels, or establis
 
 ## Related guides
 
+- [Backend contract](../../../docs/backend-contract.md): interfaces, ownership, and capabilities.
+- [Extending backends](../../../docs/extending-backends.md): a compilable example and shared conformance tests.
 - [Metal backend](../metal/README.md): the active GPU implementation target.
 - [GPU architecture and ownership](../../../docs/gpu.md).
 - [Tensor](../../../tensor/README.md) and [nn](../../../nn/README.md).

@@ -11,6 +11,10 @@ This guide describes what each check establishes and where evidence is still inc
 | --- | --- |
 | Ordinary tests in all modules | `mise run test` |
 | Focused module tests | `mise run test:nn` |
+| Backend contracts, CPU, and contributor example | `mise run test:backend` |
+| Metal conformance on Apple hardware | `mise run test:backend:metal` |
+| GPU model parity and gradients | `mise run test:gpu:parity` |
+| GPU race checks | `mise run test:gpu:race` |
 | Formatting, build, vet, lint, tests | `mise run check` |
 | Full local CI gate | `mise run ci` |
 | Race detector | `mise run test:race` |
@@ -40,6 +44,25 @@ These small reference cases use an absolute tolerance of `1e-5`.
 
 Special-value tests include NaN, infinity, signed zero, and invalid numerical domains.
 Coverage percentages complement these checks but do not establish numerical correctness by themselves.
+
+## Backend conformance
+
+The reusable `tensor/backendtest` package exercises real devices and independent
+numerical references. Every backend runs the base Device suite and the suites for
+its claimed capabilities. Missing capabilities are valid and must return explicit
+unsupported-operation errors through Tensor. Numerical suites cannot be replaced
+by mocks; focused test doubles remain useful for injected allocation or execution
+failures.
+
+CPU and Metal run the same capability contracts. Tests cover foreign and closed
+buffers, malformed views, output overlap, device ordering, shared handles, scopes,
+queued resource retention, and concurrent independent allocations. The MatMul-only
+contributor example demonstrates partial capability support without modifying
+Tensor or NeuralNet. Tests remain beside matching source files.
+
+See the [backend contract](backend-contract.md), [implementation tutorial](extending-backends.md),
+and [refactor validation report](performance/backend-refactor.md) for reproduction
+commands, numerical tolerances, and measured limitations.
 
 ## Gradient checks
 
@@ -94,21 +117,24 @@ They also verify target gradients for MSE and saved class-label semantics for cr
 
 ## Fuzzing
 
-The bounded fuzz task runs five targets:
+The bounded fuzz task runs seven targets:
 
 | Target | Properties |
 | --- | --- |
 | FuzzShapes | Negative dimensions and overflow, checked against arbitrary-precision multiplication. |
 | FuzzBroadcast | Valid broadcast dimensions and incompatible shape pairs. |
+| FuzzViewLayout | Backend storage bounds, output overlap, strides, and checked element counts. |
 | FuzzViews | Transpose round trips, contiguous copies, reshape preservation, indexing, and slice bounds. |
 | FuzzUnmarshal | Checkpoint headers, byte lengths, checksums, JSON payloads, and model decoding. |
 | FuzzRestore | Architecture references, layer metadata, cycles, parameter references, and bounded reconstruction. |
+| FuzzLoadArchive | YOLO archive metadata, byte counts, malformed inputs, and bounded weight loading. |
 
 Each target runs for three seconds with two workers.
 Input sizes bound tensor allocations.
 Go can preserve interesting inputs in its fuzz cache.
 
-A recorded pass executed 248,283 layout cases, 238,722 broadcast cases, and 189,860 view cases.
+The backend refactor pass executed 252,295 shape cases, 244,166 broadcast cases,
+266,907 backend-layout cases, and 150,850 Tensor-view cases.
 Short fuzz runs provide regression evidence.
 They do not prove that every shape or layout is correct.
 
@@ -123,7 +149,8 @@ Local checks use Go 1.27.3 on macOS arm64 with an Apple M1 Pro.
 | Experimental SIMD suite | Passed across all modules. |
 | Shape and view fuzzing | Passed the bounded targets. |
 | Linux amd64/arm64, CGo disabled | Cross-compiled with and without SIMD. |
-| Standalone module candidates | All four current modules passed with workspace mode disabled and temporary modfiles resolving local dependencies. Versioned gates use tensor v0.2.0 and nn v0.4.0; run them independently with published checksums. |
+| Standalone module candidates | simdops, Tensor, and the unimplemented CUDA/ROCm packages passed with workspace mode disabled. nn stops at missing Tensor v0.3.0 checksums; downstream release gates require public upstream tags. |
+| Backend conformance | CPU, Metal on real hardware, and the MatMul-only contributor example passed their claimed suites. |
 | Linear regression and XOR | Passed their convergence checks. |
 | MNIST fixtures | Loader checks, dense and CNN training, partial batches, parameter gradients, and seeded inference passed. |
 | Checkpoints | Built-in model round trips, shared identity, exact float32 bits, corruption checks, and loading without partial parameter changes. |
@@ -174,4 +201,5 @@ YOLO integration tests use explicitly supplied local weights and compare 320 and
 These checks are separate from ordinary CPU CI. The manual Metal workflow requires a self-hosted Mac GPU runner.
 GOWORK=off checks for the new downstream releases remain deferred until their upstream tags resolve publicly.
 No temporary replacements or invented checksum entries substitute for that release gate.
-The [GPU guide](gpu.md) and [performance report](performance/metal.md) record the exact evidence and limits.
+The [GPU guide](gpu.md), [Metal performance report](performance/metal.md), and
+[backend refactor report](performance/backend-refactor.md) record the evidence and limits.

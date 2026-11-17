@@ -204,8 +204,20 @@ The graph remains eager and independent of backend implementation details.
 Backward creates its seed on the output device and performs differentiation through tensor operations.
 Queued GPU errors are synchronized before gradient commit or graph consumption.
 
-GPU leaf gradients own independent leases and accumulate across forward scopes until ZeroGrad.
+Leaf gradients own independent handles on every device and accumulate across forward scopes until ZeroGrad.
 Intermediate gradients follow their forward scope's lifetime. Grad handles are borrowed until clearing or replacement.
 Use a batch scope through Forward, Backward, optimizer Step, and ZeroGrad, then close the scope.
 Move parameters before creating an optimizer. Adam owns device moments and provides Close to release them.
 See [GPU training](gpu.md#neural-networks-and-gradients) for lifecycle and checkpoint compatibility.
+
+## Saved parameter values
+
+Each recorded operation retains the parameter generations used by its forward
+pass. Updating a parameter preserves its identity and keeps older generations
+alive while a graph still needs them. Successful backward releases those graph
+references; retired tensor handles then close. Failed backward preserves the
+graph for retry, and abandoned-graph cleanup is a safety net.
+
+`Value.Data()` exposes a borrowed parameter handle. External callers use
+`Tensor.Retain` when they need an independent reference across updates.
+Explicit training and parameter transfers still require caller synchronization.

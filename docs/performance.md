@@ -4,6 +4,8 @@
 
 For the current optimization measurements, numerical validation, allocation
 tradeoffs, and reproduction commands, see [CPU performance](performance/cpu.md).
+For the capability-based architecture, lifecycle checks, contributor conformance,
+and before/after costs, see [Backend refactor validation](performance/backend-refactor.md).
 The measurements below are retained as the original historical baseline.
 
 The tables below record the original numerical and dense-network baseline.

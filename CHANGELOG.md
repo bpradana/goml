@@ -6,7 +6,11 @@ Publish compatible tensor, nn, and YOLO versions before the independent Metal ba
 simdops remains at v0.1.0. CUDA, ROCm, and the nested Metal examples module have no release tags.
 Downstream checksums and standalone checks require the upstream tags to resolve publicly.
 
-- Tensor-owned device contracts, opaque storage leases, explicit transfers, temporary scopes, and fallible host access.
+- Composable contracts in `tensor/backend`, typed operations, standardized errors, and explicit CPU/Metal device identities.
+- Unified backend-owned storage, safe shared views, retained handles, and scopes on CPU and Metal, preserving optimized numerical kernels.
+- Breaking Tensor migration: use `CPU()` instead of nil, `HostData()` instead of `Data()`, and `MakeContiguous()` instead of `Contiguous()`; same-device `To` copies while `Retain` shares.
+- Reusable backend conformance suites, source-paired numerical tests, a compiled MatMul-only contributor backend, and backend development tasks.
+- Saved parameter generations survive updates until graph consumption; cross-device transfers reject active parameter graphs.
 - Independent Apple Metal backend with cached embedded shaders, persistent buffers, MPS MatMul, and native MPSGraph convolution gradients.
 - Device-resident arithmetic, broadcasting, reductions, layout operations, activations, pooling, and all three spatial interpolation modes.
 - Existing nn models, eager autograd, gradient accumulation, SGD, and Adam on GPU without intermediate array downloads.
@@ -15,7 +19,7 @@ Downstream checksums and standalone checks require the upstream tags to resolve 
 - YOLOv8n weight transfer, GPU Forward, staged Postprocess, and complete detection at 320 and 640.
 - Minimal, clearly unimplemented CUDA and ROCm module reservations outside the active workspace.
 - Package logos, GPU migration and performance guides, opt-in Mac hardware CI, Metal release-note automation, and runnable examples.
-- Actual M1 Pro parity, convergence, allocation-lifetime, and repeated benchmark evidence in the [Metal report](docs/performance/metal.md).
+- Actual M1 Pro parity, convergence, allocation-lifetime, and repeated benchmark evidence in the [Metal report](docs/performance/metal.md) and [backend refactor report](docs/performance/backend-refactor.md).
 
 ## tensor v0.2.0, nn v0.4.0, and contrib/nn/yolo v0.2.0
 

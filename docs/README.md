@@ -10,6 +10,9 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | Use allocation-free slice operations | [simdops](../simdops/README.md) |
 | Work with numerical arrays and views | [tensor](../tensor/README.md) |
 | Run tensor operations and models on Apple Silicon | [Metal](../contrib/backend/metal/README.md) and [GPU contracts](gpu.md) |
+| Implement an independent execution backend | [Backend contract](backend-contract.md) and [contributor tutorial](extending-backends.md) |
+| Migrate development device APIs | [Backend migration](backend-migration.md) |
+| Review backend migration measurements | [Backend refactor validation](performance/backend-refactor.md) |
 | Inspect GPU parity and measured workloads | [Metal performance](performance/metal.md) |
 | Run pretrained YOLOv8n detection | [YOLO](../contrib/nn/yolo/README.md) |
 | Inspect pretrained numerical comparisons | [YOLO validation](yolo-validation.md) |

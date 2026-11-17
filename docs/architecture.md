@@ -5,7 +5,7 @@
 goml separates slice kernels, numerical arrays, and differentiation into three Go modules.
 Each module can be imported and released independently.
 A fourth module, contrib/nn/yolo, provides pretrained YOLOv8n inference on top of nn.
-The independent contrib/backend/metal module implements tensor-owned device contracts.
+The independent contrib/backend/metal module implements the tensor/backend contracts.
 This guide explains their boundaries and the execution model.
 
 ## Dependency direction
@@ -25,7 +25,10 @@ flowchart TD
     YOLO --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
-    Metal["contrib/backend/metal<br/>native GPU execution"] --> Tensor
+    Metal["contrib/backend/metal<br/>native GPU execution"] --> Contract["tensor/backend<br/>capabilities and shared types"]
+    Tensor --> Contract
+    CPU["tensor/internal/cpu<br/>optimized host kernels"] --> Contract
+    Tensor --> CPU
     SIMD --> Std["Go standard library"]
 ```
 
@@ -36,9 +39,9 @@ flowchart TD
 | [nn](../nn/README.md) | Differentiable values, graphs, parameters, model composition, objectives, updates. | SIMD dispatch, tensor storage mutation, device backends. |
 
 nn and its subpackages import tensor and never import simdops directly.
-Tensor imports simdops for contiguous arithmetic.
+The internal CPU backend imports simdops for contiguous arithmetic.
 CPU execution has no third-party runtime dependencies beyond the three-module chain.
-Metal imports tensor and owns the CGo bridge. Tensor and nn do not import native backends.
+Metal imports tensor/backend and owns the CGo bridge. Tensor and nn do not import native backends.
 
 ## Workspace and versioned modules
 
@@ -56,7 +59,7 @@ The workspace resolves local changes without relative replace directives.
 | [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.5.0` and `tensor v0.3.0` |
 | [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 
-The version declarations resolve simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
+The version declarations target simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -67,21 +70,21 @@ See [releasing](releasing.md) for dependency order and checksum generation.
 
 ```mermaid
 flowchart TD
-    Input["Tensor operation"] --> Validate["Validate values and shapes"]
-    Validate --> Layout{"Matching shapes<br/>and contiguous inputs?"}
-    Layout -->|yes| Slice["Pass storage slices to simdops"]
-    Layout -->|no| Index["Map logical indices<br/>through strides and broadcasting"]
-    Slice --> Kernel{"SIMD experiment enabled?"}
-    Kernel -->|no| Scalar["Scalar kernel"]
-    Kernel -->|yes| Vector["Portable SIMD groups<br/>plus scalar tail"]
-    Index --> Output["New immutable result"]
-    Scalar --> Output
-    Vector --> Output
+    Input[Tensor operation] --> Validate[Shape and device validation]
+    Validate --> Capability{Required capability available?}
+    Capability -->|no| Error[ErrUnsupported]
+    Capability -->|yes| Output[Allocate immutable result]
+    Output --> Dispatch[Invoke one backend operation]
+    Dispatch --> CPU[CPU: SIMD and optimized concrete loops]
+    Dispatch --> Metal[Metal: cached native kernels and ordered queue]
 ```
 
-[Tensor arithmetic](../tensor/arithmetic.go) chooses the contiguous fast path.
-[Broadcast indexing](../tensor/broadcast.go) handles general layouts.
-[Shape helpers](../tensor/internal/shape/) validate layouts and compatibility.
+[Tensor arithmetic](../tensor/arithmetic.go) validates and dispatches.
+[CPU arithmetic](../tensor/internal/cpu/arithmetic.go) preserves contiguous SIMD
+and efficient broadcast traversal. [Shape helpers](../tensor/internal/shape/)
+validate common mathematical layouts. [Backend contracts](backend-contract.md)
+define execution, storage, and ownership; [extending backends](extending-backends.md)
+walks through a compilable independent implementation.
 
 The [simdops API](../simdops/arithmetic.go) validates lengths before writing.
 Its [private kernels](../simdops/internal/kernels/) assume those validated lengths.
@@ -93,7 +96,7 @@ The public API contains no experimental vector types.
 
 ## Tensor storage and views
 
-Tensor stores private element data, a shape, strides, an offset, and a logical element count.
+Tensor stores a backend-owned storage reference, a device, shape, strides, offset, and logical element count.
 Contiguous arrays use row-major order.
 Views change metadata and share immutable storage.
 
@@ -102,11 +105,11 @@ flowchart LR
     Source["Caller slice"] -->|From copies| Storage["Private backing storage"]
     Original["Original tensor metadata"] --> Storage
     View["Transpose or Slice metadata"] --> Storage
-    Original -->|Contiguous copies| Copy["Independent row-major storage"]
-    View -->|Contiguous copies| Materialized["Independent logical values"]
+    Original -->|MakeContiguous copies| Copy["Independent row-major storage"]
+    View -->|MakeContiguous copies| Materialized["Independent logical values"]
 ```
 
-Shape, Strides, and Data return copies.
+Shape and Strides return copies. HostData explicitly reads a fallible logical-value copy.
 Public operations cannot expose writable broadcast storage.
 Reshape shares storage only for supported contiguous layouts.
 
@@ -154,7 +157,8 @@ Activations and CrossEntropy register validated single-input backward rules thro
 LayerNorm uses nn.NewMultiOperation to connect input, scale, and bias gradients.
 Recurrent and attention layers compose ordinary differentiable operations.
 Conv2D training extracts differentiable patches before matrix multiplication;
-inference uses bounded patch tiles in tensor and writes NCHW output directly.
+CPU inference uses bounded patch tiles in the CPU backend and writes NCHW output directly.
+Metal uses native MPSGraph forward and backward convolution.
 The [layer guide](layers.md) shows the model paths and shape contracts.
 
 MSE uses `*nn.Value` targets.
@@ -163,7 +167,7 @@ The generic loss interface preserves this distinction without runtime type asser
 
 ## Concurrency and performance boundaries
 
-Kernels and matrix multiplication execute sequentially.
+CPU kernels and matrix multiplication execute sequentially.
 There are no global pools, worker engines, or per-element goroutines.
 
 Immutable tensor reads can run concurrently.
@@ -171,7 +175,8 @@ Inference can share a model while parameters remain unchanged.
 Backward, optimizer updates, and gradient clearing require external synchronization.
 
 The current matrix implementation improves traversal while retaining reference accumulation order.
-Blocking, packing, buffer reuse, and parallel workers require benchmark evidence.
+Existing blocked traversal and selective packing remain in the CPU backend.
+Additional buffer reuse and parallel workers require benchmark evidence.
 The [performance report](performance.md) records the existing baseline.
 
 ## Scope
@@ -185,7 +190,8 @@ CPU paths remain pure Go. There is no goml JIT, compiled graph engine, or distri
 See [GPU ownership and migration](gpu.md) for device execution and native resource boundaries.
 
 Future numerical types and additional operations must preserve the ownership and dependency boundaries.
-Internal extension points do not imply public backend or plugin interfaces.
+The public backend contract supports independently implemented capabilities.
+It does not introduce a plugin registry, dynamic loader, or scheduling framework.
 
 ## Persistence boundaries
 

@@ -104,9 +104,9 @@ mise run example:tensor
 The tensor example prints the original array, its transposed view, and their matrix product:
 
 ```text
-tensor(shape=[2 3], data=[1 2 3 4 5 6])
-tensor(shape=[3 2], data=[1 4 2 5 3 6])
-tensor(shape=[2 2], data=[14 32 32 77])
+tensor(shape=[2 3], device=CPU, elements=6)
+tensor(shape=[3 2], device=CPU, elements=6)
+tensor(shape=[2 2], device=CPU, elements=4)
 ```
 
 Run a complete training example:
@@ -221,7 +221,7 @@ func main() {
 ```
 
 ```text
-tensor(shape=[2 2], data=[14 32 32 77])
+tensor(shape=[2 2], device=CPU, elements=4)
 ```
 
 Arithmetic allocates results and broadcasts trailing dimensions.
@@ -230,7 +230,7 @@ A scalar has shape `[]` and one element. Zero-length dimensions are valid.
 
 `Reshape` requires contiguous storage and an unchanged element count.
 It returns an error for unsupported noncontiguous reshapes.
-Use `Contiguous` when you want an explicit copy.
+Use `MakeContiguous` when you want an explicit copy.
 The [tensor contract](docs/tensor-semantics.md) defines indexing, reductions,
 empty arrays, numerical edge cases, and sharing.
 
@@ -261,9 +261,11 @@ The [nn guide](nn/README.md) contains a complete training program.
 | Operation or object | Ownership rule |
 | --- | --- |
 | Tensor construction from a slice | Copies the input values and shape. |
-| Shape, Strides, and Data | Return independent copies. |
+| Shape and Strides | Return independent metadata copies. |
+| HostData | Returns an explicit fallible logical-value copy on the host. |
 | Transpose, Slice, contiguous Reshape | Share immutable backing storage. |
-| Contiguous | Always materializes independent row-major storage. |
+| MakeContiguous | Always materializes independent row-major storage. |
+| Retain and Close | Independent storage-sharing handles; closing one preserves other views. |
 | Tensor arithmetic | Allocates a new result. |
 | Value | Owns its graph references and accumulated gradient. |
 | Backward | Accumulates gradients and consumes the forward graph. |
@@ -338,7 +340,7 @@ The [validation guide](docs/testing.md) records what has been verified.
 | --- | --- |
 | `go test ./...` fails at the repository root | This is a multi-module workspace. Use `mise run test`. |
 | A standalone downstream check reports missing dependencies or checksums | Run that module's `deps:tidy` task. For new releases, confirm the upstream tag is public and Go's proxy has refreshed. |
-| Reshape rejects a transposed array | Materialize it with `Contiguous`, then reshape. |
+| Reshape rejects a transposed array | Materialize it with `MakeContiguous`, then reshape. |
 | Backward reports a consumed graph | Run Forward again. Detach only when you intend to use a result as a constant. |
 | Parameters receive no gradients | Check for inference mode or detached inputs in the differentiable path. |
 | A second optimizer step repeats the previous update | Step retains gradients. Call ZeroGrad before the next accumulation. |
@@ -361,6 +363,9 @@ The [validation guide](docs/testing.md) records what has been verified.
 | --- | --- |
 | [Documentation map](docs/README.md) | Choose a guide by task. |
 | [Architecture](docs/architecture.md) | Module boundaries, source layout, and ownership. |
+| [Backend contract](docs/backend-contract.md) | Device identity, capabilities, buffer ownership, and synchronization. |
+| [Extending backends](docs/extending-backends.md) | A compilable MatMul-only implementation and reusable conformance tests. |
+| [Backend migration](docs/backend-migration.md) | Explicit CPU devices, host reads, transfers, and resource lifetimes. |
 | [Tensor semantics](docs/tensor-semantics.md) | Shapes, views, broadcasting, reductions, and errors. |
 | [Autograd](docs/autograd.md) | Graph lifecycle, gradients, loss targets, and inference. |
 | [Neural network layers](docs/layers.md) | Convolution, recurrent state, attention, and transformer contracts. |

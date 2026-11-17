@@ -13,32 +13,37 @@ flowchart LR
     NN["Existing nn models and autograd"] --> Tensor["Tensor metadata and device contracts"]
     YOLO["YOLOv8n"] --> NN
     Tensor --> CPU["Pure-Go CPU storage and SIMD"]
-    Metal["Independent Metal module"] --> Tensor
+    Metal["Independent Metal module"] --> Contract["tensor/backend contracts"]
+    Tensor --> Contract
     Metal --> Native["Objective-C bridge, MPS, and embedded shaders"]
     Tensor --> Download["Explicit HostData or ToCPU"]
 ```
 
-Tensor owns the focused device, arithmetic, layout, convolution, spatial, and validation contracts.
+The tensor/backend package owns focused, optional device and numerical contracts.
 Metal implements them. Tensor and nn do not import Metal.
 Metal's runtime module depends only on tensor and indirect simdops.
 The nested Metal examples module supplies nn and YOLO integration workloads without adding those backend dependencies.
 
 ## Tensor migration
 
-| CPU API | GPU behavior | Explicit alternative |
-| --- | --- | --- |
-| From, Zeros, Ones, Rand, Randn | Construct CPU tensors as before. | To(device), Scope.To, FullLike, or FromLike. |
-| Device | Returns nil for CPU. | Returns the owning device instance for GPU storage. |
-| Data | Panics for GPU storage. | HostData downloads a logical copy and returns errors. |
-| At | Returns an error for GPU storage. | ToCPU, then At. |
-| Contiguous | Panics for GPU storage. | MakeContiguous allocates on the current device and returns errors. |
-| String | Reports device and bounded shape metadata. | HostData for explicit value inspection. |
-| Reshape, Transpose, Slice | Share storage through independent leases. | Close each retained GPU lease or use a Scope. |
+| API | Behavior |
+| --- | --- |
+| From, Zeros, Ones, Rand, Randn | Default to the explicit CPU context. |
+| FromOn, ZerosOn, OnesOn, ScalarOn | Allocate directly on a selected device. |
+| Device | Returns the owning execution context on CPU and Metal. |
+| HostData | Explicit fallible logical read into independent host memory. |
+| At | Host-native indexing; accelerator access returns ErrUnsupported. |
+| MakeContiguous | Fallible independent materialization on the current device. |
+| String | Bounded metadata without host reads or synchronization. |
+| Retain, Reshape, Transpose, Slice | Independent handles sharing immutable storage. |
+| Close, Scope, Keep | Explicit lifetimes on CPU and Metal. |
 
-Arithmetic preserves the input device. Mixing CPU and GPU tensors or separate device instances returns an error.
-GPU mathematical operations never silently download values or invoke CPU numerical kernels.
-Cross-device To explicitly stages through host memory. Same-device To creates an independent storage lease.
-CPU To(nil) and HostData return copies.
+Arithmetic preserves its input device. Mixing CPU and GPU or separate contexts
+returns ErrDeviceMismatch. Missing capabilities return ErrUnsupported. No GPU
+operation silently invokes CPU numerical kernels. Cross-device To explicitly
+stages through host memory; same-device To makes an on-device copy. Use Retain
+for an independent storage-sharing handle. See the [backend contract](backend-contract.md)
+and [migration guide](backend-migration.md).
 
 Metal supports strided inputs, trailing-dimension broadcasting, and up to eight dimensions.
 The kernels use 32-bit element indexing. Native allocation limits can be lower.
@@ -60,7 +65,7 @@ flowchart TD
     CloseScope --> CloseDevice["Close optimizer, retained outputs, and device"]
 ```
 
-A tensor contains immutable metadata and either Go-managed data or a GPU storage lease.
+A tensor contains immutable metadata and a reference to backend-owned storage on every device.
 Views increment the underlying allocation's reference count. Closing one lease preserves other views.
 Commands retain native resources until completion. Device.Close waits before invalidating remaining buffers.
 Explicit lease cleanup waits for concurrent Go cleanup callbacks to finish releasing their references.
@@ -92,7 +97,7 @@ Use a fresh optimizer after changing devices.
 Wrap each batch in a scope. Keep that scope open through Backward and Step.
 Clear gradients before closing the scope. GPU leaf gradients own independent leases and can
 accumulate across scopes until ZeroGrad. Intermediate gradients share the forward scope's lifetime.
-Grad and GPU parameter Data handles are borrowed. Retain an independent view before clearing or updating them.
+Grad and parameter Data handles are borrowed on every device. Use Retain before clearing or updating them.
 
 Backward seeds and arithmetic stay on the output device. Shared dependencies accumulate normally.
 Backward waits for queued GPU errors before committing gradients or consuming a graph.

@@ -41,9 +41,10 @@ Each index must lie in `[0,dimension)`.
 Negative indices and rank mismatches return errors.
 Scalar At takes no indices.
 
-Data copies logical values into row-major order.
+HostData explicitly copies logical values into row-major order.
 It follows shape, strides, and offset rather than returning the backing slice.
-String previews at most eight dimensions and eight values.
+HostData returns transfer and synchronization errors.
+String reports at most eight dimensions, the device, and element count without reading values.
 
 For values 1 through 6 arranged as `[2,3]`:
 
@@ -68,7 +69,7 @@ Reshape requires a contiguous layout and the same element count.
 It does not infer a `-1` dimension.
 It returns an error rather than copying an unsupported noncontiguous layout.
 
-Contiguous always creates independent row-major storage.
+MakeContiguous always creates independent row-major storage.
 It copies even when the input is already contiguous.
 
 ```mermaid
@@ -76,7 +77,7 @@ flowchart LR
     Original["Original metadata"] --> Shared["Immutable shared storage"]
     Transpose["Transposed metadata"] --> Shared
     Slice["Sliced metadata"] --> Shared
-    Transpose -->|Contiguous| New["Independent row-major copy"]
+    Transpose -->|MakeContiguous| New["Independent row-major copy"]
     New -->|Reshape| Reshaped["New metadata sharing the copy"]
 ```
 
@@ -176,14 +177,24 @@ Immutable tensor reads can run concurrently.
 Caller-owned random generators and nn parameter updates have separate synchronization requirements.
 See [autograd](autograd.md) for model and gradient ownership.
 
-## Explicit GPU storage
+## Device and resource ownership
 
-CPU storage and numerical contracts remain unchanged. GPU tensors keep the same shape,
-strides, offset, and Float32 layout through opaque, reference-counted storage leases.
-Operations preserve their input device. Mixed devices and unsupported kernels return errors.
-Views retain independent leases and share immutable values.
+Every constructed tensor has a device. Default constructors use `tensor.CPU()`;
+`FromOn`, `ZerosOn`, `OnesOn`, and `ScalarOn` explicitly select another context.
+Inputs from different contexts cannot be combined. Numerical operations preserve
+the input device and never fall back to CPU silently.
 
-GPU Data and Contiguous panic. HostData, ToCPU, and MakeContiguous provide explicit fallible alternatives.
-At returns an error for GPU storage. String shows metadata without downloading values.
-Close retained GPU tensors and iteration scopes explicitly. Device shutdown synchronizes pending work.
-See [GPU contracts and migration](gpu.md) for complete ownership and synchronization rules.
+`To` makes an independent copy; `Retain` creates a storage-sharing independent
+handle. Views also own independent handles. Close releases a handle on every
+device and rejects subsequent value access. Other views remain valid. The final
+reference releases its backend buffer. CPU device Close is harmless; closing an
+owned accelerator context invalidates its allocations.
+
+A `Scope` owns temporary handles inherited by operations. `Keep` detaches a result
+before scope closure. Pending asynchronous commands retain native resources until
+completion. Explicit HostData and ToCPU calls synchronize host reads. At is a
+host-native capability and does not perform hidden accelerator reads.
+
+See the [backend contract](backend-contract.md) for capabilities, physical views,
+errors, and synchronization, and the [migration guide](backend-migration.md) for
+API changes.

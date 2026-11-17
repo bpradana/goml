@@ -138,3 +138,21 @@ Standalone dependency checks become mandatory once upstream releases exist.
 
 Publication is a separate maintainer operation.
 Follow the [release guide](docs/releasing.md) in dependency order.
+
+## Backend contributions
+
+Start with the [backend contract](docs/backend-contract.md) and
+[implementation tutorial](docs/extending-backends.md). Implement Device and only
+needed capabilities; do not add a registry or change unrelated Tensor or NeuralNet
+code. A complete MatMul-only example lives in `tensor/examples/backend`.
+
+Keep tests paired with their source: `array.go` and `array_test.go`, `matmul.go` and
+`matmul_test.go`. Use names that identify behavior and detailed subtests. Run the
+shared Device suite and every capability suite your backend claims. Mock-generated
+test doubles may exercise focused failure paths; numerical conformance executes
+real implementations and cannot be replaced by mocks.
+
+Use `mise run test:backend` for portable contracts, CPU, and contributor examples.
+Use `mise run test:backend:metal` and the GPU parity/race tasks on supported Apple
+hardware. CUDA and ROCm remain documentation-only source reservations outside the
+active workspace. Raw benchmark outputs stay outside the repository.

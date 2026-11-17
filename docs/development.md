@@ -64,6 +64,10 @@ Specialized checks are separate because they have different costs or prerequisit
 | `check` | Runs format checks, build, vet, lint, and ordinary tests. |
 | `ci` | Adds race tests and govulncheck to check. |
 | `test:race` | Runs the Go race detector across all modules. |
+| `test:backend` / `test:backend:cpu` | Checks shared contracts, CPU conformance, Tensor ownership, and the contributor example. |
+| `test:backend:metal` | Runs shared and native Metal tests on supported Apple hardware. |
+| `lint:backend` | Lints Tensor contracts, CPU kernels, examples, and Metal. |
+| `bench:backend:cpu` / `bench:backend:metal` | Runs kernel and complete-model benchmarks for the selected backend. |
 | `test:simd` | Tests every module with `GOEXPERIMENT=simd`. |
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |

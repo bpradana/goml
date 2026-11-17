@@ -180,8 +180,8 @@ This comparison favors tiled inference for its memory reduction at similar
 latency. The direct reference was slower on the tested workloads, and was not
 added to production dispatch.
 
-`Data()` now checks contiguity once and uses `copy` for contiguous storage.
-Strided copies advance coordinates incrementally. `Contiguous()` still returns
+The host-read kernel, now exposed through `HostData()`, checks contiguity once and uses `copy` for contiguous storage.
+Strided copies advance coordinates incrementally. `MakeContiguous()` returns
 independent storage, and views still share immutable backing storage. Tensor
 concatenation now copies directly into final output storage; neural-network
 concatenation delegates to it instead of copying every input and the output.

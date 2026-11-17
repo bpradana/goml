@@ -54,8 +54,8 @@ func main() {
 ```
 
 ```text
-tensor(shape=[3 2], data=[1 4 2 5 3 6])
-tensor(shape=[2 2], data=[14 32 32 77])
+tensor(shape=[3 2], device=CPU, elements=6)
+tensor(shape=[2 2], device=CPU, elements=4)
 ```
 
 The transposed array shares the original storage.
@@ -69,9 +69,11 @@ Run the repository example with `mise run example:tensor`.
 | --- | --- |
 | Construction | `From`, `Scalar`, `Zeros`, `Ones`, `Rand`, `Randn` |
 | Metadata | `Shape`, `Strides`, `Rank`, `Numel`, `IsContiguous` |
-| Reading | `At`, `Data`, bounded `String` |
+| Reading | `HostData`, host-native `At`, metadata-only `String` |
 | Views | `Reshape`, `Transpose`, `Slice` |
-| Materialization | `Contiguous` |
+| Materialization | `MakeContiguous` |
+| Device selection | `CPU`, `FromOn`, `ZerosOn`, `OnesOn`, `ScalarOn`, `Device`, `To`, `ToCPU` |
+| Lifetimes | `Retain`, `Close`, `NewScope`, `Keep` |
 | Arithmetic | `Add`, `Sub`, `Mul`, `Div`, `Scale`, `Neg` |
 | Mathematics | `Exp`, `Log`, `Sqrt` |
 | Reductions | `Sum`, `Mean`, `Max` |
@@ -101,12 +103,13 @@ A scalar has rank zero, shape `[]`, and one element.
 Dimensions can be zero but cannot be negative.
 Element counts and row-major strides are checked for integer overflow.
 
-At takes one index per dimension.
+At takes one index per dimension on a host-native device.
+Accelerator indexing returns an unsupported-operation error; use HostData for explicit inspection.
 For a scalar, At takes no indices.
 Negative indices and indices outside the shape return errors.
 
 Shape and Strides return copies.
-Data returns a copy in logical row-major order, including for transposed and sliced arrays.
+HostData returns a fallible copy in logical row-major order, including for transposed and sliced arrays.
 
 ## Views and ownership
 
@@ -117,7 +120,7 @@ Data returns a copy in logical row-major order, including for transposed and sli
 | Slice | No. | Yes. |
 | Reshape of a contiguous array | No. | Yes. |
 | Reshape of an unsupported noncontiguous array | Returns an error. | No result. |
-| Contiguous | Yes, including for a contiguous input. | No. |
+| MakeContiguous | Yes, including for a contiguous input. | No. |
 | Arithmetic and reductions | Yes. | No. |
 
 Views allocate metadata while sharing element storage.
@@ -127,7 +130,7 @@ Transpose with no axes reverses the dimension order.
 Explicit axes must form a complete permutation.
 Slice selects a half-open `[start,end)` interval with unit step.
 
-Use Contiguous before a reshape that needs row-major materialization.
+Use MakeContiguous before a reshape that needs row-major materialization.
 Reshape does not infer a `-1` dimension or copy implicitly.
 
 ## Mathematics
@@ -168,7 +171,29 @@ tensor: matmul: incompatible shapes [2 3] and [4 5]
 ```
 
 The current implementation is sequential and accumulates in increasing inner-dimension order.
-There is no batched multiplication, operand packing, or worker pool.
+Blocked traversal and selective RHS packing preserve increasing inner-dimension
+accumulation order. Batched multiplication and worker pools are not implemented.
+
+## Devices and backends
+
+Constructors default to the explicit shared `tensor.CPU()` device. `FromOn` and
+other `On` constructors select a context directly. Every tensor owns a handle to
+backend storage; views retain independent handles. Close tensors on both CPU and
+Metal, or use scopes for temporary results. The CPU context itself is stateless
+and its Close does not invalidate allocations.
+
+`To` copies values, including within a device. `Retain` shares immutable storage.
+`HostData` is the explicit fallible host-read API. `MakeContiguous` materializes on
+the current device. String formatting never downloads or synchronizes data.
+
+The optional [Metal backend](../contrib/backend/metal/README.md) supplies native
+GPU execution. CPU installation does not require CGo or Apple frameworks.
+
+Backend contributors implement the small interfaces in [`backend`](backend) and
+run the shared [`backendtest`](backendtest) suites. See the
+[backend contract](../docs/backend-contract.md),
+[implementation tutorial](../docs/extending-backends.md), and
+[migration guide](../docs/backend-migration.md).
 
 ## Verification and performance
 
@@ -194,15 +219,5 @@ See [architecture](../docs/architecture.md) for private storage and kernel bound
 The current API supports float32, unit-step slicing, explicit axes, and 2D matrix products.
 It has no arbitrary dtypes, negative strides, advanced indexing, or mutable broadcast views.
 Gradient tracking belongs to [nn](../nn/README.md).
-
-## GPU execution
-
-CPU is the default device and retains the pure-Go numerical paths.
-The optional [Metal backend](../contrib/backend/metal/README.md) implements tensor-owned compute contracts.
-To and Scope.To upload explicitly. HostData and ToCPU download explicitly.
-MakeContiguous materializes on the current device. Mixed devices return errors.
-GPU Data and Contiguous panic rather than hiding fallible transfers. At returns an error.
-Views retain independent storage leases. Close scopes, retained tensors, and devices explicitly.
-See [GPU ownership and API migration](../docs/gpu.md).
 
 Licensed under [MIT](../LICENSE).
