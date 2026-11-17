@@ -1,9 +1,10 @@
 # Changelog
 
-## nn v0.6.0
+## nn v0.6.0 and contrib/nn/yolo v0.3.1
 
 - `Value.Detach()` returns `(*Value, error)` with an independent unscoped tensor handle, preserving constants across parameter updates and source closure without copying data.
 - Detach lifetime regressions cover parameter replacement before first use, repeated backward passes, source closure, and scoped tensors on CPU, plus native Metal lease cleanup.
+- YOLO v0.3.1 requires nn v0.6.0, with generated standalone dependency checksums.
 
 ## tensor v0.3.0, nn v0.5.0, contrib/nn/yolo v0.3.0, and Metal v0.1.0
 

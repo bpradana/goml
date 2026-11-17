@@ -56,10 +56,10 @@ The workspace resolves local changes without relative replace directives.
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
-| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.5.0` and `tensor v0.3.0` |
+| [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.6.0` and `tensor v0.3.0` |
 | [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 
-The version declarations target simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
+The version declarations target simdops v0.1.0, tensor v0.3.0, and nn v0.6.0.
 Workspace tests use local modules, while standalone checks require published dependencies.
 
 Subpackages are organizational boundaries inside a module.
@@ -182,7 +182,7 @@ The [performance report](performance.md) records the existing baseline.
 ## Scope
 
 The current architecture supports float32 arrays, first-order eager differentiation, and CPU neural networks.
-nn v0.5.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence, with optimized CPU numerical kernels.
+nn v0.6.0 includes convolution, spatial pooling and interpolation, recurrent layers, transformer encoder blocks, and model persistence, with optimized CPU numerical kernels.
 YOLO-specific blocks, archive loading, conversion, decoding, and NMS stay in contrib/nn/yolo.
 The Python converter is an offline tool; no Python or third-party inference runtime is needed by the Go module.
 The optional Metal backend supplies explicit transfers and GPU computation through tensor contracts.

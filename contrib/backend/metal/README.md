@@ -206,7 +206,7 @@ MPS-private workspaces are excluded from these totals. Go benchmark allocation c
 
 ## Releases and related guides
 
-Release tensor v0.3.0, nn v0.5.0, and YOLO v0.3.0 in dependency order before the full release set.
+Metal v0.1.0 requires tensor v0.3.0. The integration examples use nn v0.6.0 and YOLO v0.3.1; publish those upstream versions before standalone example validation.
 Release Metal only after its tensor dependency resolves with GOWORK=off and native hardware tests pass.
 The examples module is validated through go.work and has no release target.
 CUDA and ROCm remain unimplemented source reservations.

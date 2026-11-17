@@ -5,18 +5,19 @@
 Each module has an independent version and a Go subdirectory tag.
 This procedure publishes dependencies before their consumers.
 
-**Release set:** tensor/v0.3.0, nn/v0.5.0, contrib/nn/yolo/v0.3.0, and contrib/backend/metal/v0.1.0.
-simdops remains at v0.1.0. Publish dependencies in that order so each consumer
-can resolve its required numerical APIs and generate verified checksums.
-Keep existing published tags unchanged.
+**Current release:** nn/v0.6.0, then contrib/nn/yolo/v0.3.1.
+Tensor v0.3.0, simdops v0.1.0, and Metal v0.1.0 remain unchanged.
+Skip publication commands for versions already present on the remote; validate
+them without moving or recreating their tags. Publish changed dependencies before
+consumers so each tidy can resolve the real upstream version.
 
 ## Version and dependency order
 
 ```mermaid
 flowchart LR
     SIMD["simdops/v0.1.0"] --> Tensor["tensor/v0.3.0"]
-    Tensor --> NN["nn/v0.5.0<br/>requires tensor v0.3.0"]
-    NN --> YOLO["contrib/nn/yolo/v0.3.0<br/>requires nn v0.5.0"]
+    Tensor --> NN["nn/v0.6.0<br/>requires tensor v0.3.0"]
+    NN --> YOLO["contrib/nn/yolo/v0.3.1<br/>requires nn v0.6.0"]
     Tensor --> YOLO
     Tensor --> Metal["contrib/backend/metal/v0.1.0<br/>requires tensor v0.3.0"]
 ```
@@ -25,8 +26,8 @@ flowchart LR
 | --- | --- | --- |
 | simdops | `simdops/v0.1.0` | None. |
 | tensor | `tensor/v0.3.0` | `simdops/v0.1.0` |
-| nn | `nn/v0.5.0` | `tensor/v0.3.0` |
-| contrib/nn/yolo | `contrib/nn/yolo/v0.3.0` | `nn/v0.5.0` and `tensor/v0.3.0` |
+| nn | `nn/v0.6.0` | `tensor/v0.3.0` |
+| contrib/nn/yolo | `contrib/nn/yolo/v0.3.1` | `nn/v0.6.0` and `tensor/v0.3.0` |
 | contrib/backend/metal | `contrib/backend/metal/v0.1.0` | `tensor/v0.3.0` |
 
 Activation, checkpoint, layer, loss, and optimizer packages share the nn module's version.
@@ -67,7 +68,7 @@ MNIST fixtures do not establish real-dataset accuracy.
 ## Prepare versioned dependencies
 
 nn requires tensor v0.3.0 for the optimized convolution, joining, and update
-kernels. YOLO requires nn v0.5.0 and tensor v0.3.0. Workspace tests use local
+kernels. YOLO requires nn v0.6.0 and tensor v0.3.0. Workspace tests use local
 source, so validate the versioned dependencies independently before tagging.
 
 ## Publish tensor v0.3.0
@@ -75,7 +76,7 @@ source, so validate the versioned dependencies independently before tagging.
 Validate tensor against simdops v0.1.0 before publishing the reviewed commit:
 
 ```sh
-GOWORK=off mise run deps:tidy:tensor
+GOWORK=off GOPROXY=direct GONOSUMDB=github.com/bpradana/goml mise run deps:tidy:tensor
 GOWORK=off mise run test:tensor
 GOWORK=off mise run lint:tensor
 git tag tensor/v0.3.0
@@ -90,20 +91,20 @@ Once tensor/v0.3.0 resolves, generate nn's dependency checksums.
 Validate the module without local workspace resolution:
 
 ```sh
-GOWORK=off mise run deps:tidy:nn
+GOWORK=off GOPROXY=direct GONOSUMDB=github.com/bpradana/goml mise run deps:tidy:nn
 GOWORK=off mise run test:nn
 ```
 
 Review any manifest or checksum changes and commit them when needed.
 If no dependency files changed, proceed without an empty dependency commit.
 
-## Publish nn v0.5.0
+## Publish nn v0.6.0
 
 After the reviewed release commit is on main, create and push the module tag:
 
 ```sh
-git tag nn/v0.5.0
-git push origin main nn/v0.5.0
+git tag nn/v0.6.0
+git push origin main nn/v0.6.0
 ```
 
 The tag push triggers the release-note workflow.
@@ -112,10 +113,10 @@ For future upstream changes, publish those modules first and then update their d
 
 ## Publish the independent YOLO module
 
-After nn/v0.5.0 and tensor/v0.3.0 resolve publicly, generate the downstream checksums and verify the module:
+After nn/v0.6.0 and tensor/v0.3.0 resolve publicly, generate the downstream checksums and verify the module:
 
 ```sh
-GOWORK=off mise run deps:tidy:yolo
+GOWORK=off GOPROXY=direct GONOSUMDB=github.com/bpradana/goml mise run deps:tidy:yolo
 mise run test:standalone:yolo
 GOWORK=off mise run lint:yolo
 git diff -- contrib/nn/yolo/go.mod contrib/nn/yolo/go.sum
@@ -126,13 +127,26 @@ Commit the generated dependency files, then push the reviewed commit and nested 
 ```sh
 git add contrib/nn/yolo/go.mod contrib/nn/yolo/go.sum
 git commit -m "chore(yolo): record published nn dependency checksums"
-git tag contrib/nn/yolo/v0.3.0
-git push origin main contrib/nn/yolo/v0.3.0
+git tag contrib/nn/yolo/v0.3.1
+git push origin main contrib/nn/yolo/v0.3.1
 ```
 
 Do not invent nn checksums before publication or commit a relative replace directive.
 The core standalone gate and test:standalone:yolo validate their own versioned dependencies.
 The nested tag triggers module-specific release-note automation with its full installation path.
+
+## Verify the separate Metal examples module
+
+The examples module has no release tag. After publishing nn and YOLO, update its
+requirements to those actual versions and validate without the workspace:
+
+```sh
+GOWORK=off GOPROXY=direct GONOSUMDB=github.com/bpradana/goml mise run deps:tidy:gpu:examples
+mise run test:standalone:gpu:examples
+```
+
+Run the tests on supported Apple hardware. Commit its generated checksums and
+push main after validation. Keep CUDA and ROCm outside this release sequence.
 
 ## Final verification
 
@@ -177,7 +191,7 @@ mise run test:gpu:metal
 mise run test:gpu:parity
 mise run test:gpu:race
 mise run test:gpu:portable
-GOWORK=off mise run deps:tidy:metal
+GOWORK=off GOPROXY=direct GONOSUMDB=github.com/bpradana/goml mise run deps:tidy:metal
 GOWORK=off mise run test:gpu:metal
 GOWORK=off mise run lint:gpu:metal
 ```
@@ -240,7 +254,7 @@ The workflow never modifies an existing release's manually edited notes.
 
 First push the workflow commit to main.
 In GitHub, open Actions, then Release notes, then Run workflow.
-Select main and enter one existing module tag, such as `nn/v0.5.0`.
+Select main and enter one existing module tag, such as `nn/v0.6.0`.
 Run it separately for each module that needs release notes.
 
 The workflow supports manual backfills even when an older tag does not contain the workflow file.

@@ -408,7 +408,7 @@ dir = "contrib/nn/yolo"
 run = "go mod tidy"
 
 [tasks."test:standalone:yolo"]
-description = "Verify YOLO's published tensor v0.3.0 and nn v0.5.0 dependencies"
+description = "Verify YOLO's published tensor v0.3.0 and nn v0.6.0 dependencies"
 dir = "contrib/nn/yolo"
 env = { GOWORK = "off" }
 run = "go test ./..."
@@ -568,3 +568,14 @@ run = [{ task = "bench:tensor" }, { task = "bench:conv2d" }, { task = "bench:inf
 [tasks."bench:backend:metal"]
 description = "Benchmark Metal initialization, transfers, kernels, and model execution"
 run = [{ task = "bench:gpu:metal" }, { task = "bench:gpu:models" }]
+
+[tasks."deps:tidy:gpu:examples"]
+description = "Tidy GPU integration examples against published module versions"
+dir = "contrib/backend/metal/examples"
+run = "go mod tidy"
+
+[tasks."test:standalone:gpu:examples"]
+description = "Test GPU integration examples against published modules on Apple hardware"
+dir = "contrib/backend/metal/examples"
+env = { GOWORK = "off" }
+run = "go test ./..."

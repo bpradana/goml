@@ -11,7 +11,7 @@
 ![simdops](https://img.shields.io/badge/simdops-v0.1.0-blue)
 ![tensor](https://img.shields.io/badge/tensor-v0.3.0-blue)
 ![nn](https://img.shields.io/badge/nn-v0.6.0-blue)
-![yolo](https://img.shields.io/badge/yolo-v0.3.0-blue)
+![yolo](https://img.shields.io/badge/yolo-v0.3.1-blue)
 ![metal](https://img.shields.io/badge/metal-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -35,7 +35,7 @@ Default builds use scalar kernels. Go's experimental portable SIMD API is option
 
 **Module versions:** simdops v0.1.0, tensor v0.3.0, and nn v0.6.0.
 The nn release includes convolutional, recurrent, transformer, checkpoint, pooling, SiLU, and spatial interpolation APIs.
-The independent [YOLO module](contrib/nn/yolo/README.md) provides pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.3.0`.
+The independent [YOLO module](contrib/nn/yolo/README.md) provides pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.3.1`.
 See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/README.md) for their APIs and examples.
 
 The optional [Metal backend](contrib/backend/metal/README.md) adds persistent GPU tensors,
