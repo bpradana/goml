@@ -296,3 +296,28 @@ After publication, add the actual backend version to the examples module, tidy
 its dependencies, and verify it with GOWORK disabled. Do not invent an unpublished
 module checksum or add a committed relative replace directive. Existing published
 tags remain unchanged.
+
+## Data module and MNIST application
+
+The initial data release target is `data/v0.1.0`. The module requires the already
+published Tensor v0.3.0 and has no nn or accelerator dependency. Validate before
+creating its module-prefixed tag:
+
+```sh
+mise run test:standalone:data
+mise run lint:data
+mise run test:data:race
+mise run build:data:portable
+```
+
+Release automation recognizes data/v tags and runs data's tasks with GOWORK off.
+Do not change existing published tags. The data source is separate from ignored
+local datasets and model files under `archive/`.
+
+The MNIST application is a separate development module under nn/examples/mnist.
+Until the initial data version is published, go.work resolves it locally and the
+application intentionally has no fabricated data requirement/checksum. After the
+real tag resolves, add that published version, run `mise run deps:tidy:mnist`, and
+verify `mise run test:standalone:mnist`. Do not commit relative replace directives.
+The application has no independent release tag; ordinary nn consumers do not
+acquire a data or Metal runtime dependency.

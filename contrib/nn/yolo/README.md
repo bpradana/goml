@@ -46,15 +46,15 @@ From the repository root:
 
 ```sh
 mise install --locked
-mkdir -p data/yolo
+mkdir -p archive/yolo
 
 curl -fL https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt \
-  -o data/yolo/yolov8n.pt
+  -o archive/yolo/yolov8n.pt
 curl -fL https://raw.githubusercontent.com/ultralytics/assets/main/im/bus.jpg \
-  -o data/yolo/bus.jpg
+  -o archive/yolo/bus.jpg
 
-mise run convert:yolo -- data/yolo/yolov8n.pt data/yolo/yolov8n.goml
-mise run example:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 320
+mise run convert:yolo -- archive/yolo/yolov8n.pt archive/yolo/yolov8n.goml
+mise run example:yolo -- -model archive/yolo/yolov8n.goml -image archive/yolo/bus.jpg -size 320
 ```
 
 The conversion task installs its locked Python dependencies through uv.
@@ -77,7 +77,7 @@ go get github.com/bpradana/goml/contrib/nn/yolo@v0.3.1
 Load once and reuse the model:
 
 ```go
-model, err := yolo.Load("data/yolo/yolov8n.goml")
+model, err := yolo.Load("archive/yolo/yolov8n.goml")
 if err != nil {
     return err
 }
@@ -121,7 +121,7 @@ Close releases the model's GPU leases. CPU tensors remain ordinary Go values.
 The YOLO module does not import Metal. The backend's separate integration module contains the runnable example:
 
 ```sh
-mise run example:gpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 640
+mise run example:gpu:yolo -- -model archive/yolo/yolov8n.goml -image archive/yolo/bus.jpg -size 640
 ```
 
 See [Metal setup](../../backend/metal/README.md), [GPU ownership](../../../docs/gpu.md),
@@ -203,13 +203,13 @@ mise run test:converter
 For the optional real-weight comparison, first let Go write the exact model input:
 
 ```sh
-export GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml"
-export GOML_YOLO_IMAGE="$PWD/data/yolo/bus.jpg"
-export GOML_YOLO_REFERENCE="$PWD/data/yolo/reference-320"
+export GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml"
+export GOML_YOLO_IMAGE="$PWD/archive/yolo/bus.jpg"
+export GOML_YOLO_REFERENCE="$PWD/archive/yolo/reference-320"
 export GOML_YOLO_SIZE=320
 
 mise run test:yolo:reference
-mise run reference:yolo -- data/yolo/yolov8n.pt data/yolo/reference-320 --size 320
+mise run reference:yolo -- archive/yolo/yolov8n.pt archive/yolo/reference-320 --size 320
 mise run test:yolo:reference
 ```
 

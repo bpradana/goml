@@ -8,7 +8,7 @@ for CPU decoding and NMS. Detection JSON goes to stdout. Timing and tracked peak
 The first invocation includes native graph compilation and warm-up.
 
 ```sh
-mise run example:gpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 640
+mise run example:gpu:yolo -- -model archive/yolo/yolov8n.goml -image archive/yolo/bus.jpg -size 640
 ```
 
 Use `-size 320` for the smaller validated input. The program does not download weights or images.

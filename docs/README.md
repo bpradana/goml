@@ -1,6 +1,6 @@
 # Documentation
 
-goml provides three core Go modules and an independent YOLO inference module.
+goml provides independently versioned numerical, neural-network, dataset, and inference modules.
 The [project README](../README.md) introduces the APIs and provides the local quick start.
 
 ## Choose a guide
@@ -8,6 +8,7 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | Task | Guide |
 | --- | --- |
 | Use allocation-free slice operations | [simdops](../simdops/README.md) |
+| Load datasets, shuffle, collate, and preprocess samples | [data](../data/README.md) and [contributor guide](datasets.md) |
 | Work with numerical arrays and views | [tensor](../tensor/README.md) |
 | Run tensor operations and models on Apple Silicon | [Metal](../contrib/backend/metal/README.md) and [GPU contracts](gpu.md) |
 | Run WGSL kernels and models through native WebGPU | [WebGPU](../contrib/backend/webgpu/README.md) and [validation report](performance/webgpu.md) |
@@ -39,7 +40,7 @@ Run this command from the repository root:
 mise run docs:api
 ```
 
-It prints GoDoc for the four modules and nn's activation, checkpoint, layer, loss, and optimizer packages.
+It prints GoDoc for the library modules and nn's activation, checkpoint, layer, loss, and optimizer packages.
 Exported function comments define input constraints, output shapes, errors, and ownership.
 
 The complete README programs were compiled and executed during local validation.

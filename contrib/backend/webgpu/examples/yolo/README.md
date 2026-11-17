@@ -9,8 +9,8 @@ and non-maximum suppression are explicit CPU work.
 
 ```sh
 mise run example:gpu:webgpu:yolo -- \
-  -model data/yolo/yolov8n.goml \
-  -image data/yolo/bus.jpg \
+  -model archive/yolo/yolov8n.goml \
+  -image archive/yolo/bus.jpg \
   -size 320
 ```
 
@@ -23,7 +23,7 @@ for model setup. The optional pretrained test checks both 320 and 640 inputs
 against CPU raw heads and detections using local reference inputs:
 
 ```sh
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
 ```
 
 Direct WGSL convolution is a baseline implementation. Compare complete workloads

@@ -25,8 +25,8 @@
 
 ---
 
-goml connects three independently usable libraries: slice kernels, N-dimensional
-tensors, and neural networks. Use `simdops` for allocation-free vector operations.
+goml connects independently usable libraries for slice kernels, N-dimensional
+tensors, neural networks, and dataset loading. Use `simdops` for allocation-free vector operations.
 Use `tensor` for numerical arrays. Add `nn` when you need differentiation and training.
 
 The CPU runtime uses Go and its standard library. Tensors contain `float32` values,
@@ -44,6 +44,10 @@ It owns all CGo and Apple framework integration. CPU applications retain their e
 The optional [WebGPU backend](contrib/backend/webgpu/README.md) supplies WGSL computation
 through native WebGPU adapters, with its own buffers, numerical kernels, and examples.
 These release targets require upstream publication in the [documented order](docs/releasing.md).
+
+The independent [data module](data/README.md) supplies typed datasets, synchronous loaders,
+local MNIST/CSV/image loading, and explicit batch ownership. It remains independent of nn
+and accelerator implementations.
 
 ## Contents
 
@@ -66,6 +70,7 @@ These release targets require upstream publication in the [documented order](doc
 
 | Area | Available behavior |
 | --- | --- |
+| Datasets | Typed Dataset/DataLoader, deterministic shuffling, Tensor snapshots, local MNIST/CSV/ImageFolder, and copying transforms. |
 | Slice kernels | Add, subtract, multiply, divide, scale, Axpy, dot, sum, and maximum over `[]float32`. Successful calls allocate no memory. |
 | Numerical arrays | Scalars and N-dimensional tensors, checked shapes and strides, zero-sized dimensions, and bounded value previews. |
 | Views | Transpose, half-open slicing, and contiguous reshape share storage. Explicit contiguous conversion copies logical values. |
@@ -146,6 +151,7 @@ flowchart TD
     Loss["nn/loss · typed loss objects"] --> NN
     Optimizer["nn/optimizer · parameter updates"] --> NN
     YOLO["contrib/nn/yolo · pretrained detection"] --> NN
+    Data["data · datasets and batches"] --> Tensor
     NN --> Tensor["tensor · immutable numerical arrays"]
     Tensor --> Contract["tensor/backend · device capabilities"]
     Metal["contrib/backend/metal"] --> Contract
@@ -158,6 +164,7 @@ flowchart TD
 | --- | --- | --- |
 | simdops | `github.com/bpradana/goml/simdops` | [Slice APIs and numerical contracts](simdops/README.md) |
 | tensor | `github.com/bpradana/goml/tensor` | [Arrays, views, and mathematics](tensor/README.md) |
+| data | `github.com/bpradana/goml/data` | [Datasets, loading, and preprocessing](data/README.md) |
 | nn | `github.com/bpradana/goml/nn` | [Differentiation and model training](nn/README.md) |
 | yolo | `github.com/bpradana/goml/contrib/nn/yolo` | [Pretrained object detection](contrib/nn/yolo/README.md) |
 | metal | `github.com/bpradana/goml/contrib/backend/metal` | [Apple Metal execution](contrib/backend/metal/README.md) |
@@ -183,6 +190,7 @@ additional modules. There is no root `go.mod`.
 | `nn/loss/` | Loss interface, MSE, and stable cross-entropy implementations. |
 | `nn/optimizer/` | SGD, Adam, and optimizer state. |
 | `nn/checkpoint/` | Checked weight files and complete built-in network persistence. |
+| `data/` | Typed datasets, loaders, local file readers, and transforms. |
 | `nn/examples/` | Generated-data training examples and local-data MNIST. |
 | `contrib/nn/yolo/` | Independent YOLOv8n inference, model archives, and offline conversion. |
 | `contrib/backend/` | Optional Metal/WebGPU execution and unimplemented CUDA/ROCm reservations. |

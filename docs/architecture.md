@@ -23,6 +23,7 @@ flowchart TD
     YOLO["contrib/nn/yolo<br/>converted pretrained detection"] --> Layer
     YOLO --> Checkpoint
     YOLO --> Tensor
+    Data["data<br/>datasets, batching, transforms"] --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
     WebGPU["contrib/backend/webgpu<br/>WGSL compute"] --> Contract
@@ -37,6 +38,7 @@ flowchart TD
 | --- | --- | --- |
 | [simdops](../simdops/README.md) | Slice validation, scalar references, optional SIMD arithmetic. | Tensor layouts, graphs, model parameters. |
 | [tensor](../tensor/README.md) | Immutable float32 storage, shapes, strides, views, numerical operations. | Gradient tracking, optimizer state, layers. |
+| [data](../data/README.md) | Typed datasets, CPU collation, synchronous loading, and preprocessing. | Models, optimizers, concrete devices, automatic downloads. |
 | [nn](../nn/README.md) | Differentiable values, graphs, parameters, model composition, objectives, updates. | SIMD dispatch, tensor storage mutation, device backends. |
 
 nn and its subpackages import tensor and never import simdops directly.
@@ -44,10 +46,14 @@ The internal CPU backend imports simdops for contiguous arithmetic.
 CPU execution has no third-party runtime dependencies beyond the three-module chain.
 Metal and WebGPU import tensor/backend and own their optional native integration. Tensor and nn do not import native backends.
 
+The data module imports Tensor only. Its MNIST application is a separate module
+combining data and nn; optional Metal selection is isolated behind a build tag.
+The data and nn libraries do not import each other.
+
 ## Workspace and versioned modules
 
 The root [go.work](../go.work) selects `simdops`, `tensor`, `nn`, and `contrib/nn/yolo`.
-It also selects Metal and its separate development examples module.
+It also selects data, the separate MNIST application, and the Metal/WebGPU development modules.
 CUDA and ROCm reservations remain outside the workspace.
 There is no root `go.mod`.
 The workspace resolves local changes without relative replace directives.
@@ -56,6 +62,7 @@ The workspace resolves local changes without relative replace directives.
 | --- | --- |
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
+| [data/go.mod](../data/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 | [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.6.0` and `tensor v0.3.0` |
 | [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |

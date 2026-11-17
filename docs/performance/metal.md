@@ -25,7 +25,7 @@ GPU models are warmed before forward and detection timing.
 ```sh
 mise run bench:gpu:info
 mise run bench:gpu:metal
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run bench:gpu:models
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run bench:gpu:models
 ```
 
 The benchmark tasks print their measurements for local inspection.
@@ -148,7 +148,7 @@ lifecycle regression test, not a representative training-memory budget.
 | Original yolov8n.pt | `f59b3d833e2ff32e194b5bb8e08d211dc7c5bdf144b90d2c8412c47ccfc83b36` |
 | bus.jpg | `c02019c4979c191eb739ddd944445ef408dad5679acab6fd520ef9d434bfbc63` |
 
-Weights, images, and reference tensors stay in ignored data/yolo and are not committed.
+Weights, images, and reference tensors stay in ignored archive/yolo and are not committed.
 Ultralytics/PyTorch conversion and reference versions are recorded in the
 [existing validation report](../yolo-validation.md).
 

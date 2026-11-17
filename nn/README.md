@@ -328,13 +328,15 @@ Training, backward, updates, and gradient clearing require external synchronizat
 
 ## MNIST
 
-The [MNIST example](examples/mnist/README.md) reads local gzip-compressed IDX files.
+The [MNIST example](examples/mnist/README.md) uses the independent data module for local plain/gzip IDX files, deterministic batching, and shuffling.
 Downloads are explicit. Tests generate small local fixtures and exercise the loader and a training step.
 
 The default model is 784 → 32 → 10 with ReLU and Adam.
 Use `-model cnn` for a two-convolution classifier.
 Training reports cross-entropy and saves both architecture-plus-weights and weights-only files.
-Load a saved network with `-load-model data/mnist-model.goml -predict` for inference.
+Load a saved network with `-load-model archive/mnist-model.goml -split test -predict` for inference.
+The application is a separate workspace module; the nn library has no data dependency.
+Use `-evaluate` for local held-out evaluation, or the opt-in Metal application task.
 No real-dataset or held-out accuracy result is claimed.
 
 ## Saving models and weights
@@ -342,11 +344,11 @@ No real-dataset or held-out accuracy result is claimed.
 Use [nn/checkpoint](checkpoint/README.md) to save and restore models:
 
 ```go
-if err := checkpoint.Save("data/model.goml", model); err != nil {
+if err := checkpoint.Save("archive/model.goml", model); err != nil {
 	return err
 }
 
-restored, err := checkpoint.Load("data/model.goml")
+restored, err := checkpoint.Load("archive/model.goml")
 if err != nil {
 	return err
 }

@@ -156,3 +156,9 @@ Use `mise run test:backend` for portable contracts, CPU, and contributor example
 Use `mise run test:backend:metal` and the GPU parity/race tasks on supported Apple
 hardware. CUDA and ROCm remain documentation-only source reservations outside the
 active workspace. Raw benchmark outputs stay outside the repository.
+
+## Dataset contributions
+
+Dataset contributors can start with the [data contracts and extension guide](docs/datasets.md).
+The [custom dataset example](data/examples/custom/README.md) uses only public interfaces;
+run `mise run test:data:race` and `mise run test:standalone:data` for scoped validation.

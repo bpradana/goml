@@ -179,7 +179,7 @@ See the [migration and ownership guide](../../../docs/gpu.md).
 ```sh
 mise run example:gpu:training
 mise run example:gpu:training -- -checkpoint /tmp/linear.goml
-mise run example:gpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 640
+mise run example:gpu:yolo -- -model archive/yolo/yolov8n.goml -image archive/yolo/bus.jpg -size 640
 ```
 
 The training example learns `y = 2x + 1` with GPU-resident parameters and gradients.
@@ -201,8 +201,8 @@ mise run bench:gpu:metal
 Enable pretrained integration validation explicitly:
 
 ```sh
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run test:gpu:parity
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run bench:gpu:models
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run test:gpu:parity
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run bench:gpu:models
 ```
 
 [Measured results](../../../docs/performance/metal.md) separate resident computation,

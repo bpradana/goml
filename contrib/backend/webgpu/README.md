@@ -192,7 +192,7 @@ driver workspaces are excluded. Synchronize before comparing quiescent totals.
 
 ```sh
 mise run example:gpu:webgpu:training
-mise run example:gpu:webgpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.jpg -size 320
+mise run example:gpu:webgpu:yolo -- -model archive/yolo/yolov8n.goml -image archive/yolo/bus.jpg -size 320
 ```
 
 The [examples guide](examples/README.md) documents model setup, training cleanup,

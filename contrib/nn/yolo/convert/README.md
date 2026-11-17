@@ -12,7 +12,7 @@ Project commands run through the root mise configuration.
 From the repository root, with a local trusted checkpoint:
 
 ```sh
-mise run convert:yolo -- data/yolo/yolov8n.pt data/yolo/yolov8n.goml
+mise run convert:yolo -- archive/yolo/yolov8n.pt archive/yolo/yolov8n.goml
 ```
 
 The converter validates the YOLOv8n stage layout, folds BatchNorm into convolution parameters, checks supported operators, transposes float32 kernels, and writes a goml archive.
@@ -27,7 +27,7 @@ The optional Go integration test writes input.f32 to a reference directory.
 Generate reference raw heads and class-aware NMS results from that exact input:
 
 ```sh
-mise run reference:yolo -- data/yolo/yolov8n.pt data/yolo/reference-320 --size 320
+mise run reference:yolo -- archive/yolo/yolov8n.pt archive/yolo/reference-320 --size 320
 ```
 
 The directory must already contain input.f32 with exactly `3*size*size` little-endian float32 values.

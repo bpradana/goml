@@ -5,6 +5,9 @@
 Run these commands from the repository root after `mise install --locked`.
 Each example has a fixed seed, explicit error handling, and a convergence check.
 Ordinary tests compile and execute the generated-data examples.
+MNIST is a separate application module using [data](../../data/README.md), so the
+nn library does not depend on dataset loading. The root test/CI tasks include
+that application explicitly; use `mise run test:mnist` for its local fixtures.
 
 ## Choose an example
 

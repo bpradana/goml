@@ -22,7 +22,7 @@ serialized package execution. Original results were retained rather than
 overwritten. CPU and allocation profiles were collected separately from the
 final benchmark run.
 
-Local pretrained artifacts are `data/yolo/yolov8n.goml`, `bus.jpg`, and the
+Local pretrained artifacts are `archive/yolo/yolov8n.goml`, `bus.jpg`, and the
 existing `reference-320` and `reference-640` directories. These large artifacts
 are not included in source control. Forward benchmarks use an all-ones NCHW
 input. Detection benchmarks include preparation, inference, decoding, and NMS
@@ -232,11 +232,11 @@ mise run bench:autograd
 mise run bench:optimizer
 mise run bench:attention
 mise run bench:inference
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run bench:yolo
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise exec -- go test \
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run bench:yolo
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise exec -- go test \
   -run '^$' -bench='^BenchmarkModelStages$' -benchmem -benchtime=50ms -count=3 ./contrib/nn/yolo
 GOML_BENCH_DIR=benchmark-results/my-run \
-  GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run bench:record
+  GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run bench:record
 ```
 
 `bench:record` creates a timestamped directory by default. It records hardware,

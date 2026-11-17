@@ -40,7 +40,7 @@ with a converted archive and its neighboring bus.jpg and reference-320/reference
 input fixtures from the [YOLO validation workflow](../../../../docs/yolo-validation.md):
 
 ```sh
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
 ```
 
 The test checks 320 and 640 raw heads, detection counts, class IDs, confidence,

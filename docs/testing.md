@@ -11,6 +11,10 @@ This guide describes what each check establishes and where evidence is still inc
 | --- | --- |
 | Ordinary tests in all modules | `mise run test` |
 | Focused module tests | `mise run test:nn` |
+| Typed datasets, local file fixtures, and transforms | `mise run test:data:race` |
+| Data's published dependencies without workspace | `mise run test:standalone:data` |
+| MNIST loader integration and checkpoints | `mise run test:mnist` |
+| Explicit MNIST batch transfers and Metal training | `mise run test:data:metal` |
 | Backend contracts, CPU, and contributor example | `mise run test:backend` |
 | Metal conformance on Apple hardware | `mise run test:backend:metal` |
 | GPU model parity and gradients | `mise run test:gpu:parity` |
@@ -153,6 +157,7 @@ Local checks use Go 1.27.3 on macOS arm64 with an Apple M1 Pro.
 | Backend conformance | CPU, Metal on real hardware, and the MatMul-only contributor example passed their claimed suites. |
 | Linear regression and XOR | Passed their convergence checks. |
 | MNIST fixtures | Loader checks, dense and CNN training, partial batches, parameter gradients, and seeded inference passed. |
+| Dataset module | Public custom datasets/collators, shuffle determinism, cancellation, copying ownership, local MNIST/CSV/images, transforms, standalone builds, and Metal integration passed; see the [data report](performance/data.md). |
 | Checkpoints | Built-in model round trips, shared identity, exact float32 bits, corruption checks, and loading without partial parameter changes. |
 | Additional model examples | CNN, RNN, LSTM, and transformer pass their convergence checks. |
 

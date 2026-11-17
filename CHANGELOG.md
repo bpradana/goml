@@ -1,5 +1,12 @@
 # Changelog
 
+## data v0.1.0
+
+- Independent pure-Go Dataset/DataLoader module with typed samples and collators, deterministic epoch shuffling, DropLast, cancellation, and explicit CPU batch ownership.
+- Tensor snapshots, strict local MNIST plain/gzip IDX loading, numerical CSV datasets, bounded lazy ImageFolder decoding, and typed image/sample transforms.
+- MNIST application migrated to DataLoader with seeded shuffling, held-out evaluation, preserved Dense/CNN/checkpoint behavior, and opt-in Metal batch transfers and training.
+- Module README and logo, custom dataset/collator examples, paired tests, standalone/cross-platform validation, measured preparation/training reports, and mise/CI/release integration.
+
 ## WebGPU v0.1.0
 
 - Independent native WebGPU module with persistent Float32 buffers, explicit transfers, safe queued resource ownership, and cached embedded WGSL pipelines.

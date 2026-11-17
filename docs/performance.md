@@ -110,6 +110,9 @@ dataset accuracy. Native CI benchmark runs require pushing the repository first.
 
 ## Metal measurements
 
+Dataset preparation, decoding, batching, and the MNIST application comparison are
+recorded separately in the [data performance report](performance/data.md).
+
 The [Metal report](performance/metal.md) compares the optimized scalar CPU workload with
 resident GPU operations and transfer-inclusive execution on the same M1 Pro.
 It records startup, YOLO stages, complete detection, optimizer steps, and tracked allocation limits.

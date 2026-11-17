@@ -129,7 +129,7 @@ mise run test:gpu:webgpu:parity
 mise run test:gpu:webgpu:parity:race
 mise run test:gpu:webgpu:portable
 mise run bench:gpu:webgpu
-GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
+GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml" mise run test:gpu:webgpu:yolo
 ```
 
 Standalone backend tests use published Tensor and binding versions with GOWORK

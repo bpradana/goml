@@ -22,7 +22,7 @@ and repeated PyTorch reference validation.
 | Archive | Format version 1, 51 convolution networks, 80 classes. |
 | Postprocessing | Confidence 0.25, class-aware NMS IoU 0.45, maximum 300 detections. |
 
-Weights and images are explicitly downloaded into ignored data/yolo.
+Weights and images are explicitly downloaded into ignored archive/yolo.
 They are not committed as test fixtures.
 The converter and complete Python dependency graph are locked in contrib/nn/yolo/convert.
 The [upstream architecture](https://github.com/ultralytics/ultralytics/blob/v8.3.0/ultralytics/cfg/models/v8/yolov8.yaml) defines the model topology used by the converter and loader.
@@ -64,13 +64,13 @@ They are individual local observations rather than a statistical performance ben
 Follow the [download and conversion steps](../contrib/nn/yolo/README.md#quick-start), then run:
 
 ```sh
-export GOML_YOLO_MODEL="$PWD/data/yolo/yolov8n.goml"
-export GOML_YOLO_IMAGE="$PWD/data/yolo/bus.jpg"
-export GOML_YOLO_REFERENCE="$PWD/data/yolo/reference-320"
+export GOML_YOLO_MODEL="$PWD/archive/yolo/yolov8n.goml"
+export GOML_YOLO_IMAGE="$PWD/archive/yolo/bus.jpg"
+export GOML_YOLO_REFERENCE="$PWD/archive/yolo/reference-320"
 export GOML_YOLO_SIZE=320
 
 mise run test:yolo:reference
-mise run reference:yolo -- data/yolo/yolov8n.pt data/yolo/reference-320 --size 320
+mise run reference:yolo -- archive/yolo/yolov8n.pt archive/yolo/reference-320 --size 320
 mise run test:yolo:reference
 ```
 
