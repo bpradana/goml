@@ -202,13 +202,18 @@ The tracking flag identifies a differentiable leaf.
 | `nn.NewValue(data, true)` | Tracks gradients for this leaf. |
 | `nn.NewValue(data, false)` | Creates a constant leaf. Parameters can still cause later operations to record graphs. |
 | `nn.NewParameter(data)` | Creates a trainable leaf with stable identity. |
-| `Value.Detach()` | Shares immutable data in a new constant leaf without the old graph. |
+| `Value.Detach()` | Returns a constant leaf with an independent storage-sharing handle and no old graph; errors for invalid data. |
 | `Value.Grad()` | Returns the accumulated immutable gradient, or nil. |
 | `Value.ZeroGrad()` | Clears this value's gradient. |
 
 Parameter.Update requires the same shape.
 It replaces tensor data without changing parameter identity or clearing gradients.
 Optimizers use this boundary.
+
+Detach returns `(*Value, error)` and retains an independent, unscoped tensor handle.
+It survives parameter updates and source-handle closure without copying values.
+Close `detached.Data()` after its last use, including any backward passes that
+read it. Detach does not retain the parameter or its graph.
 
 NewOperation registers a single-input backward rule for an already-computed result.
 It validates gradient shapes while keeping graph fields private.

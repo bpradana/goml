@@ -330,3 +330,73 @@ func TestBackward_MetalRetainsForwardParameterGeneration(t *testing.T) {
 		t.Fatal("consumed graph retained retired parameter storage")
 	}
 }
+
+func TestDetach_MetalOwnsLeaseBeforeParameterUpdate(t *testing.T) {
+	device := deviceForTest(t)
+
+	initial, err := tensor.ScalarOn(device, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = initial.Close() }()
+
+	parameter, err := nn.NewParameter(initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = parameter.Value().Data().Close() }()
+
+	if err := initial.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	borrowed := parameter.Value().Data()
+	before := device.Stats()
+
+	detached, err := parameter.Value().Detach()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = detached.Data().Close() }()
+
+	if after := device.Stats(); after.LiveBuffers != before.LiveBuffers || after.LiveBytes != before.LiveBytes {
+		t.Fatal("detach copied device storage instead of retaining a lease")
+	}
+
+	replacement, err := tensor.ScalarOn(device, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = replacement.Close() }()
+
+	if err := parameter.Update(replacement); err != nil {
+		t.Fatal(err)
+	}
+
+	if !borrowed.IsClosed() {
+		t.Fatal("detach retained the parameter generation instead of an independent handle")
+	}
+
+	values, err := detached.Data().HostData()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(values) != 1 || values[0] != 2 || detached.Data().Device() != device {
+		t.Fatalf("detached values %v, want original Metal value [2]", values)
+	}
+
+	for _, data := range []*tensor.Tensor{detached.Data(), replacement, parameter.Value().Data()} {
+		if err := data.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := device.Synchronize(); err != nil {
+		t.Fatal(err)
+	}
+
+	if stats := device.Stats(); stats.LiveBuffers != 0 || stats.LiveBytes != 0 {
+		t.Fatalf("detach cleanup retained native storage: %+v", stats)
+	}
+}

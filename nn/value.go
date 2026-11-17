@@ -80,10 +80,23 @@ func (v *Value) ZeroGrad() {
 	v.ownsGrad = false
 }
 
-// Detach shares immutable data in a new constant leaf with no graph references.
-// Trainable values combined with this leaf can still construct a graph.
-func (v *Value) Detach() *Value {
-	return &Value{data: v.data, parameter: v.parameter}
+// Detach returns a constant leaf with an independent, unscoped tensor handle
+// sharing immutable storage. It retains no graph or parameter references.
+// Parameter replacement and closing the source handle do not invalidate it.
+// The caller owns closing the returned value's Data after its last use, including
+// backward passes that need it. Nil, uninitialized, or closed data return errors.
+// Consumed values may be detached; trainable operands can still record a new graph.
+func (v *Value) Detach() (*Value, error) {
+	if v == nil {
+		return nil, fmt.Errorf("nn: detach: nil value")
+	}
+
+	data, err := v.data.Retain()
+	if err != nil {
+		return nil, fmt.Errorf("nn: detach: %w", err)
+	}
+
+	return &Value{data: data}, nil
 }
 
 func checkValues(op string, values ...*Value) error {

@@ -12,11 +12,18 @@ Each operation computes its result immediately and records backward state only w
 | `NewValue(data, true)` | A differentiable leaf sharing immutable tensor data. |
 | `NewValue(data, false)` | A constant leaf. |
 | `NewParameter(data)` | A trainable parameter with stable leaf identity. |
-| `Value.Detach()` | A new constant leaf sharing data without the original graph. |
+| `Value.Detach()` | A fallible constant leaf with an independent storage-sharing handle and no original graph. |
 | `Inference(data)` | An input that suppresses tracking throughout subsequent operations. |
 
 A constant input does not disable a parameter's gradients.
 An operation records a graph when any operand tracks gradients, unless inference mode is present.
+
+`Detach` returns `(*Value, error)` and owns an independent, unscoped tensor handle
+sharing immutable storage. It remains valid after source-handle closure or
+parameter replacement, even before its first use in another operation. Close
+`detached.Data()` after its last use, including backward passes that read it.
+Nil, uninitialized, or closed source data return errors. Detach retains neither
+the old graph nor the parameter, and it can detach a consumed operation.
 
 Parameters preserve identity across iterations.
 Optimizers replace their immutable tensor data instead of exposing writable tensor storage.

@@ -1,0 +1,2 @@
+github.com/bpradana/goml/contrib/backend/metal v0.1.0/go.mod h1:YGDv4UFTzjsyNH5ZW3J43MtyDAEr0RzCtZKmdE6dyN0=
+github.com/bpradana/goml/contrib/nn/yolo v0.3.0/go.mod h1:nHjPq0zSsftY9+i63kVW9MqrFMnIRxI1TcF62mCcnSk=

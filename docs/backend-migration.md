@@ -13,6 +13,7 @@ CPU checkpoint loading does not require Metal.
 | String operation identifiers in backend methods | `backend.UnaryOp`, `BinaryOp`, `ScalarOp`, `ReduceOp`, and `ResizeMode`. |
 | `Tensor.Data()` | `Tensor.HostData() ([]float32, error)`. |
 | `Tensor.Contiguous()` | `Tensor.MakeContiguous() (*Tensor, error)`. |
+| `Value.Detach() *Value` borrows its source handle | `Value.Detach() (*Value, error)` owns an independent unscoped handle; close its Data after the last use. |
 | Same-device `To` shares GPU storage | `To` copies on all devices; `Retain` explicitly shares immutable storage. |
 | CPU Tensor Close is a no-op | Close releases that handle on every device. Other retained views remain valid. |
 | String prints CPU values | String prints bounded metadata on every device. Read HostData explicitly for values. |
@@ -28,7 +29,8 @@ update. Autograd retains parameter generations used by recorded forward passes
 until successful graph consumption. Gradients, optimizers, and layer composition
 continue using ordinary Tensor operations. Recreate optimizers after moving model
 parameters between devices. Cross-device parameter transfers reject active
-graphs; consume those graphs before moving parameters.
+graphs; consume those graphs before moving parameters. Detached values retain
+their original storage independently and stay on their original device.
 
 A scope now works on CPU as well as Metal. `Scope.To` shares same-device storage
 through a new handle, unlike `Tensor.To`, which copies. Close each scope after its

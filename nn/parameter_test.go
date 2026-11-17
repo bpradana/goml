@@ -97,7 +97,13 @@ func TestParameter_DetachedConstantPreservesSavedForwardValue(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	product, err := Mul(input, parameter.Value().Detach())
+	detached, err := parameter.Value().Detach()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = detached.Data().Close() }()
+
+	product, err := Mul(input, detached)
 	if err != nil {
 		t.Fatal(err)
 	}
