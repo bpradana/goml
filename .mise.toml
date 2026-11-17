@@ -230,6 +230,7 @@ description = "Fuzz tensor layouts, views, checkpoint files, and network metadat
 run = [
   "go test -run '^$' -fuzz '^FuzzShapes$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
   "go test -run '^$' -fuzz '^FuzzBroadcast$' -fuzztime=3s -parallel=2 ./tensor/internal/shape",
+  "go test -run '^$' -fuzz '^FuzzViewLayout$' -fuzztime=3s -parallel=2 ./tensor/backend",
   "go test -run '^$' -fuzz '^FuzzViews$' -fuzztime=3s -parallel=2 ./tensor",
   "go test -run '^$' -fuzz '^FuzzUnmarshal$' -fuzztime=3s -parallel=2 ./nn/checkpoint",
   "go test -run '^$' -fuzz '^FuzzRestore$' -fuzztime=3s -parallel=2 ./nn/layer",
@@ -538,3 +539,32 @@ run = [
 description = "Tidy Metal after its tensor dependency is published"
 dir = "contrib/backend/metal"
 run = "go mod tidy"
+
+[tasks."test:backend:contract"]
+description = "Test shared backend contracts independently of Tensor implementations"
+dir = "tensor/backend"
+run = "go test ./..."
+
+[tasks."test:backend:cpu"]
+description = "Test the CPU backend and its contracts"
+run = "go test ./tensor/backend/... ./tensor/backendtest/... ./tensor/internal/cpu/... ./tensor/examples/backend/... ./tensor"
+
+[tasks."test:backend"]
+description = "Test backend contracts, CPU conformance, and the contributor example"
+run = [{ task = "test:backend:cpu" }]
+
+[tasks."test:backend:metal"]
+description = "Test Metal conformance on supported Apple hardware"
+run = [{ task = "test:gpu:metal" }]
+
+[tasks."lint:backend"]
+description = "Lint backend contracts, CPU kernels, examples, and Metal"
+run = [{ task = "lint:tensor" }, { task = "lint:gpu:metal" }]
+
+[tasks."bench:backend:cpu"]
+description = "Benchmark CPU kernels, convolution, and complete model inference"
+run = [{ task = "bench:tensor" }, { task = "bench:conv2d" }, { task = "bench:inference" }]
+
+[tasks."bench:backend:metal"]
+description = "Benchmark Metal initialization, transfers, kernels, and model execution"
+run = [{ task = "bench:gpu:metal" }, { task = "bench:gpu:models" }]
