@@ -72,3 +72,10 @@ allocate no per-observation storage. Callers synchronize concurrent mutation;
 the initial implementation intentionally has no internal locks or goroutines.
 
 See [measured performance](performance/metrics.md) for workloads and limitations.
+
+The runnable [custom mean-bias example](../metrics/examples/custom/README.md)
+implements the public interface with a concrete report type. The
+[Trainer regression example](../trainer/examples/regression/main.go) imports
+that exact implementation and passes it directly to NewRegressor. See
+[pluggable metrics](training.md#plug-in-custom-metrics) for reset, borrowing,
+error, and per-epoch snapshot behavior.

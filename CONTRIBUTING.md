@@ -162,3 +162,17 @@ active workspace. Raw benchmark outputs stay outside the repository.
 Dataset contributors can start with the [data contracts and extension guide](docs/datasets.md).
 The [custom dataset example](data/examples/custom/README.md) uses only public interfaces;
 run `mise run test:data:race` and `mise run test:standalone:data` for scoped validation.
+
+## Metrics and training changes
+
+Metrics is standard-library-only. New accumulators implement the generic
+Update/Reset boundary and may expose their own typed Result; test streaming
+partitions, invalid-update atomicity, and independent result snapshots. The
+[custom example](metrics/examples/custom/README.md) shows an external implementation.
+
+Trainer composes public data, nn, and Tensor APIs. Keep concrete backend imports
+in optional applications/tests, close each yielded batch and per-batch scope,
+and preserve caller ownership of models, optimizers, devices, and metric instances.
+Run `mise run test:trainer:race` and `mise run test:standalone:trainer`; optional
+hardware tasks validate real Metal/WebGPU execution. Each implementation file
+has a matching test file. See the [training guide](docs/training.md).

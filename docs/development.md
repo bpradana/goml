@@ -45,7 +45,7 @@ mise install --locked go uv golangci-lint \
 ## Choose a task
 
 Scoped tasks use `action:target` names.
-Aggregate tasks run the five ordinary CPU modules and the separate MNIST application. Metal and WebGPU tasks are explicit and separate.
+Aggregate tasks run the ordinary CPU modules, including Metrics and Trainer, and the separate MNIST application. Metal and WebGPU tasks are explicit and separate.
 
 | Purpose | Aggregate | Module example |
 | --- | --- | --- |
@@ -65,6 +65,10 @@ Specialized checks are separate because they have different costs or prerequisit
 | `ci` | Adds race tests and govulncheck to check. |
 | `test:race` | Runs the Go race detector across all modules. |
 | `test:backend` / `test:backend:cpu` | Checks shared contracts, CPU conformance, Tensor ownership, and the contributor example. |
+| `test:metrics` / `test:trainer` | Tests streaming reports, typed plugins, training, validation, callbacks, and resource cleanup. |
+| `test:standalone:metrics` / `test:standalone:trainer` | Verifies published dependencies with GOWORK off. |
+| `test:trainer:metal` / `test:trainer:webgpu` | Runs training/validation parity and resident-memory checks on real hardware. |
+| `bench:metrics` / `bench:trainer` | Measures streaming accumulation and toy training/evaluation. |
 | `test:data` / `test:data:race` | Tests local datasets, transforms, loaders, examples, and concurrent reads. |
 | `test:standalone:data` | Verifies data against published Tensor dependencies without go.work. |
 | `test:data:metal` | Opt-in MNIST batch transfer and training on real Metal hardware. |
@@ -77,7 +81,7 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:simd` | Tests every module with `GOEXPERIMENT=simd`. |
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
-| `test:standalone` | Tests simdops, tensor, nn, and data with `GOWORK=off`. Requires published upstream versions. |
+| `test:standalone` | Tests simdops, tensor, nn, data, metrics, and trainer with `GOWORK=off`. Requires published upstream versions. |
 | `test:standalone:yolo` | Tests the independent YOLO module with published nn v0.5.0 and tensor v0.3.0. |
 | `test:converter` | Checks pinned Python converter formatting, lint, and unit tests. |
 | `build:portable` | Cross-compiles Linux amd64/arm64, with CGo disabled, scalar and SIMD. |

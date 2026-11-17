@@ -2,14 +2,15 @@
 
 [Neural network guide](../../README.md) · [Data module](../../../data/README.md) · [Project](../../../README.md)
 
-This application uses goml's Dataset and DataLoader APIs for local MNIST data.
+This application uses goml's Dataset, DataLoader, and Trainer APIs for local MNIST data.
 Dense and CNN architectures, stable cross-entropy, Adam, checkpoint save/load,
 weight-only restoration, and prediction are preserved. Dataset parsing,
 normalization, target creation, shuffling, and batch construction belong to data.
 
 The application is a separate development module so the nn library does not
-depend on data or a concrete GPU backend. Use the committed workspace until
-`data/v0.1.0` is published and the real application requirement can be added.
+depend on data, Trainer, or a concrete GPU backend. Data and accelerator
+dependencies are published; use the committed workspace while Trainer is local
+and untagged. Add its real version to this application after publication.
 It has no independent release tag and no committed relative replace directives.
 
 ## Prepare local files
@@ -48,12 +49,15 @@ mise run example:mnist -- -data archive -model cnn -limit 1000 -epochs 3 -batch 
 | `-shuffle` | `true` | Shuffle training batches deterministically each epoch. |
 | `-seed` | `42` | Epoch-shuffle seed, independent of the fixed model initialization. |
 | `-evaluate` | `false` | After each epoch, evaluate t10k files from `-data`. |
-| `-device` | `cpu` | CPU, or `metal` in the opt-in Metal build. |
+| `-device` | `cpu` | CPU, or `metal`/`webgpu` with the corresponding opt-in build tag. |
 | `-save-model` | `archive/mnist-model.goml` | Architecture/weights checkpoint; empty disables saving. |
 | `-save-weights` | `archive/mnist-weights.goml` | Weights-only checkpoint; empty disables saving. |
 | `-load-model` | Empty. | Restore architecture and weights. |
 | `-load-weights` | Empty. | Restore weights into the selected architecture. |
 | `-predict` | `false` | Evaluate a loaded checkpoint without training or saving. |
+| `-best-model` | Empty. | Save each strictly better held-out validation model. Requires `-evaluate`. |
+| `-patience` | `0` | Stop after this many validation losses without sufficient improvement; zero disables. |
+| `-min-delta` | `0` | Minimum strict loss improvement for patience reset. |
 
 Identical seed/epoch pairs produce identical sample orders. Model initialization
 still uses its original fixed PCG seed. Prediction and evaluation keep source
@@ -78,9 +82,9 @@ flowchart LR
     Backward --> Cleanup[ZeroGrad and close scope/batch]
 ```
 
-Adam retains rate 0.001, beta1 0.9, beta2 0.999, and epsilon 1e-8. A helper owns
-one batch's temporary scope, so cleanup runs before the next batch. The caller
-closes every batch even on a training error. Parameters and Adam moments remain
+Adam retains rate 0.001, beta1 0.9, beta2 0.999, and epsilon 1e-8. Trainer owns
+each yielded batch and its temporary scope, so cleanup runs before the next
+batch even on training errors. An epoch callback prints the reported metrics. Parameters and Adam moments remain
 on the selected device. Ctrl-C cancels subsequent dataset reads and iteration.
 
 ## CPU and Metal
@@ -133,3 +137,21 @@ Metal tests cover explicit transfer ownership and training both model choices.
 See the [data performance report](../../../docs/performance/data.md) for measured
 fixture timing and memory costs. Fixture validation is not a real-dataset accuracy
 study, and no held-out accuracy result is claimed.
+
+## Trainer validation and model selection
+
+```sh
+mise run example:trainer:mnist -- -evaluate -epochs 20 -patience 3 -min-delta 0.001 -best-model archive/mnist-best.goml
+mise run example:trainer:mnist:metal -- -evaluate
+mise run example:trainer:mnist:webgpu -- -evaluate
+```
+
+The best checkpoint is independent of the final model/weight files; output paths
+must differ. Patience and best-model options require held-out evaluation.
+Checkpointing preserves model architecture and weights, not optimizer state.
+The best checkpoint is not restored automatically. Prediction uses Trainer's
+optimizer-free evaluation path and keeps the existing command-line interface.
+
+For pluggable metrics, regression, and custom steps, see [Trainer](../../../trainer/README.md).
+Hardware validation and benchmark limits are recorded in the
+[Trainer performance report](../../../docs/performance/trainer.md).

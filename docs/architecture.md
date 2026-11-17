@@ -2,9 +2,9 @@
 
 [Documentation](README.md) · [Project overview](../README.md)
 
-goml separates slice kernels, numerical arrays, and differentiation into three Go modules.
+goml separates slice kernels, numerical arrays, differentiation, datasets, metrics, and training into independent Go modules.
 Each module can be imported and released independently.
-A fourth module, contrib/nn/yolo, provides pretrained YOLOv8n inference on top of nn.
+The contrib/nn/yolo module provides pretrained YOLOv8n inference on top of nn.
 The independent contrib/backend/metal module implements the tensor/backend contracts.
 This guide explains their boundaries and the execution model.
 
@@ -23,6 +23,11 @@ flowchart TD
     YOLO["contrib/nn/yolo<br/>converted pretrained detection"] --> Layer
     YOLO --> Checkpoint
     YOLO --> Tensor
+    Trainer["trainer<br/>typed training and evaluation"] --> Core
+    Trainer --> Data
+    Trainer --> Tensor
+    Trainer --> Metrics["metrics<br/>streaming host statistics"]
+    Metrics --> Std
     Data["data<br/>datasets, batching, transforms"] --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
@@ -39,6 +44,8 @@ flowchart TD
 | [simdops](../simdops/README.md) | Slice validation, scalar references, optional SIMD arithmetic. | Tensor layouts, graphs, model parameters. |
 | [tensor](../tensor/README.md) | Immutable float32 storage, shapes, strides, views, numerical operations. | Gradient tracking, optimizer state, layers. |
 | [data](../data/README.md) | Typed datasets, CPU collation, synchronous loading, and preprocessing. | Models, optimizers, concrete devices, automatic downloads. |
+| [metrics](../metrics/README.md) | Typed streaming classification/regression accumulators and reports. | Tensors, models, datasets, hardware. |
+| [trainer](../trainer/README.md) | Epochs, validation, metric updates, callbacks, early stopping, model selection. | Dataset parsing, model architecture, optimizer/device ownership. |
 | [nn](../nn/README.md) | Differentiable values, graphs, parameters, model composition, objectives, updates. | SIMD dispatch, tensor storage mutation, device backends. |
 
 nn and its subpackages import tensor and never import simdops directly.
@@ -53,7 +60,7 @@ The data and nn libraries do not import each other.
 ## Workspace and versioned modules
 
 The root [go.work](../go.work) selects `simdops`, `tensor`, `nn`, and `contrib/nn/yolo`.
-It also selects data, the separate MNIST application, and the Metal/WebGPU development modules.
+It also selects data, metrics, trainer, the separate MNIST application, and the Metal/WebGPU development modules.
 CUDA and ROCm reservations remain outside the workspace.
 There is no root `go.mod`.
 The workspace resolves local changes without relative replace directives.
@@ -63,6 +70,8 @@ The workspace resolves local changes without relative replace directives.
 | [simdops/go.mod](../simdops/go.mod) | Standard library only. |
 | [tensor/go.mod](../tensor/go.mod) | `github.com/bpradana/goml/simdops v0.1.0` |
 | [data/go.mod](../data/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
+| [metrics/go.mod](../metrics/go.mod) | Standard library only. |
+| [trainer/go.mod](../trainer/go.mod) | Data v0.1.0, Metrics v0.1.0, nn v0.6.0, Tensor v0.3.0. |
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 | [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.6.0` and `tensor v0.3.0` |
 | [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |

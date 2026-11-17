@@ -13,6 +13,8 @@
 ![nn](https://img.shields.io/badge/nn-v0.6.0-blue)
 ![yolo](https://img.shields.io/badge/yolo-v0.3.1-blue)
 ![metal](https://img.shields.io/badge/metal-v0.1.0-blue)
+![data](https://img.shields.io/badge/data-v0.1.0-blue)
+![metrics](https://img.shields.io/badge/metrics-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 [Quick start](#quick-start) ·
@@ -49,6 +51,10 @@ The independent [data module](data/README.md) supplies typed datasets, synchrono
 local MNIST/CSV/image loading, and explicit batch ownership. It remains independent of nn
 and accelerator implementations.
 
+[Metrics](metrics/README.md) supplies standalone streaming classification and regression
+evaluation. [Trainer](trainer/README.md) combines models, loaders, optimizers, and
+pluggable metrics with explicit device selection and per-batch cleanup.
+
 ## Contents
 
 - [Features](#features)
@@ -79,7 +85,8 @@ and accelerator implementations.
 | Models | Dense layers, ReLU, Sigmoid, Tanh, and Sequential composition with seeded Xavier initialization. |
 | Additional models | Conv2D, RNN, LSTM, multi-head self-attention, LayerNorm, positional encoding, and transformer encoder blocks. |
 | Checkpoints | Save weights or complete built-in Sequential networks, preserving shared layers and exact float32 values. |
-| Training | Typed MSE and cross-entropy loss objects, SGD, Adam, and explicit inference without gradient graphs. |
+| Training | Typed MSE and cross-entropy, SGD, Adam, plus optional Trainer orchestration, validation, early stopping, and best-model checkpoints. |
+| Metrics | Streaming accuracy, confusion, precision/recall/F1, MAE/MSE/RMSE/R², and typed custom metric interfaces. |
 | Verification | Numerical references, finite-difference checks, fuzzing, race detection, linting, and measured performance baselines. |
 | Object detection | Independent contrib/nn/yolo module with pretrained YOLOv8n conversion, loading, image inference, decoding, and NMS. |
 | Spatial transforms | MaxPool2D and Upsample2D with nearest, bilinear, or bicubic interpolation. |
@@ -151,6 +158,11 @@ flowchart TD
     Loss["nn/loss · typed loss objects"] --> NN
     Optimizer["nn/optimizer · parameter updates"] --> NN
     YOLO["contrib/nn/yolo · pretrained detection"] --> NN
+    Trainer["trainer · training and validation"] --> NN
+    Trainer --> Data
+    Trainer --> Tensor
+    Trainer --> Metrics["metrics · streaming evaluation"]
+    Metrics --> Std
     Data["data · datasets and batches"] --> Tensor
     NN --> Tensor["tensor · immutable numerical arrays"]
     Tensor --> Contract["tensor/backend · device capabilities"]
@@ -165,6 +177,8 @@ flowchart TD
 | simdops | `github.com/bpradana/goml/simdops` | [Slice APIs and numerical contracts](simdops/README.md) |
 | tensor | `github.com/bpradana/goml/tensor` | [Arrays, views, and mathematics](tensor/README.md) |
 | data | `github.com/bpradana/goml/data` | [Datasets, loading, and preprocessing](data/README.md) |
+| metrics | `github.com/bpradana/goml/metrics` | [Streaming evaluation and custom metrics](metrics/README.md) |
+| trainer | `github.com/bpradana/goml/trainer` | [Training loops, validation, and model selection](trainer/README.md) |
 | nn | `github.com/bpradana/goml/nn` | [Differentiation and model training](nn/README.md) |
 | yolo | `github.com/bpradana/goml/contrib/nn/yolo` | [Pretrained object detection](contrib/nn/yolo/README.md) |
 | metal | `github.com/bpradana/goml/contrib/backend/metal` | [Apple Metal execution](contrib/backend/metal/README.md) |

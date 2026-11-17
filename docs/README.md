@@ -18,6 +18,9 @@ The [project README](../README.md) introduces the APIs and provides the local qu
 | Inspect GPU parity and measured workloads | [Metal performance](performance/metal.md) |
 | Run pretrained YOLOv8n detection | [YOLO](../contrib/nn/yolo/README.md) |
 | Inspect pretrained numerical comparisons | [YOLO validation](yolo-validation.md) |
+| Train with validation, callbacks, checkpoints, and custom metrics | [Trainer](../trainer/README.md) and [training guide](training.md) |
+| Evaluate streaming predictions or implement a metric | [Metrics](metrics.md) and [custom example](../metrics/examples/custom/README.md) |
+| Inspect Trainer and metric measurements | [Trainer performance](performance/trainer.md) and [Metrics performance](performance/metrics.md) |
 | Build and train a neural network | [nn](../nn/README.md) |
 | Use convolution, recurrent state, or transformer blocks | [Layers](layers.md) |
 | Run generated-data training programs | [Neural network examples](../nn/examples/README.md) |
@@ -47,8 +50,9 @@ The complete README programs were compiled and executed during local validation.
 
 ## Status and evidence
 
-The release set is simdops v0.1.0, tensor v0.3.0, nn v0.5.0, and contrib/nn/yolo v0.3.0.
-nn resolves tensor v0.3.0; YOLO resolves nn v0.5.0 and tensor v0.3.0.
+Published library versions include simdops v0.1.0, tensor v0.3.0, nn v0.6.0,
+data v0.1.0, metrics v0.1.0, and contrib/nn/yolo v0.3.1. Trainer remains local
+and untagged; its published dependencies pass standalone validation.
 Workspace tests resolve local changes through `go.work`.
 
 The validation and performance guides distinguish completed local checks from

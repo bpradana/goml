@@ -321,3 +321,12 @@ real tag resolves, add that published version, run `mise run deps:tidy:mnist`, a
 verify `mise run test:standalone:mnist`. Do not commit relative replace directives.
 The application has no independent release tag; ordinary nn consumers do not
 acquire a data or Metal runtime dependency.
+
+## Metrics and Trainer
+
+Metrics v0.1.0 is independently published and has no goml dependencies. Trainer
+uses data v0.1.0, metrics v0.1.0, nn v0.6.0, and tensor v0.3.0. Verify with
+`mise run test:standalone:trainer` before tagging its first release. Trainer is
+currently local and untagged. The MNIST application remains workspace-based until
+Trainer has a published version; then add that actual requirement and run its
+standalone tidy/test tasks. Do not move any existing module tags.
