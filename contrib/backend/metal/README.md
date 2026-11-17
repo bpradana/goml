@@ -133,6 +133,12 @@ production Go package imports those contracts without importing Tensor or
 NeuralNet. Arithmetic, MatMul, reductions, layout, convolution, and spatial
 operations have separate source files and matching tests.
 
+Embedded sources live in [kernels/](kernels/README.md), grouped into common
+definitions, arithmetic, layout, reductions, and spatial operations. The native
+bridge assembles them into one library during initialization. MatMul and
+convolution continue using MPS and MPSGraph through the Objective-C bridge;
+they do not need duplicate shader files.
+
 Open compiles the embedded shader library once and caches compute pipelines.
 Every device instance owns its queue, caches, and allocation registry.
 A device mutex serializes encoding. Independent goroutines can operate through

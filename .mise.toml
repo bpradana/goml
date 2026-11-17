@@ -462,13 +462,13 @@ run = "go test -count=1 -v ./..."
 
 [tasks."fmt:native:metal"]
 description = "Format Metal Objective-C, headers, and shaders"
-run = "uvx --from clang-format==21.1.0 clang-format -i contrib/backend/metal/*.h contrib/backend/metal/*.m contrib/backend/metal/*.metal"
+run = "uvx --from clang-format==21.1.0 clang-format -i contrib/backend/metal/*.h contrib/backend/metal/*.m contrib/backend/metal/kernels/*.metal"
 
 [tasks."fmt:check:metal"]
 description = "Check every Metal Go file and all native sources"
 run = [
   "for file in contrib/backend/metal/*.go; do golangci-lint fmt --stdin < \"$file\" | cmp - \"$file\" || exit 1; done",
-  "uvx --from clang-format==21.1.0 clang-format --dry-run --Werror contrib/backend/metal/*.h contrib/backend/metal/*.m contrib/backend/metal/*.metal"
+  "uvx --from clang-format==21.1.0 clang-format --dry-run --Werror contrib/backend/metal/*.h contrib/backend/metal/*.m contrib/backend/metal/kernels/*.metal"
 ]
 
 [tasks."test:gpu:parity"]
@@ -497,7 +497,7 @@ run = "go test -run '^$' -bench=. -benchmem -benchtime=200ms -count=3 ./..."
 
 [tasks."bench:gpu:models"]
 description = "Measure GPU model stages using explicit local YOLO assets"
-run = "go test -run '^$' -bench=. -benchmem -benchtime=3x -count=3 ./contrib/backend/metal/examples"
+run = "go test -run '^$' -bench=. -benchmem -benchtime=3x -count=3 ./contrib/backend/metal/examples/..."
 
 [tasks."test:gpu:race"]
 description = "Run GPU backend and model tests with the Go race detector"

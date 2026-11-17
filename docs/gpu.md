@@ -138,7 +138,7 @@ It explicitly downloads GPU heads when supplied with them.
 | Audit and contract | tensor/device.go, storage.go, transfer.go | CPU slice assumptions identified across activations, spatial layers, loss, checkpoint, and optimizer code. Device imports point toward tensor. |
 | Scaffolding | contrib/backend/{metal,cuda,rocm}/go.mod and READMEs | Only Metal joins the active workspace. CUDA and ROCm compile as documentation-only packages. |
 | Storage | tensor storage, transfer, and view files | CPU ownership tests pass. GPU views survive parent Close. Scoped results and pending commands release correctly. |
-| Native foundation | Metal device.go, native files, metal.h, kernels.metal | Actual M1 Pro initialization, transfers, shared-buffer ownership, shader compilation, concurrent scopes, and pending shutdown pass. |
+| Native foundation | Metal device.go, native files, metal.h, kernels/ | Actual M1 Pro initialization, transfers, shared-buffer ownership, shader compilation, concurrent scopes, and pending shutdown pass. |
 | MatMul | Metal compute.go and MPS bridge | Rectangular, irregular, transposed, singleton-stride, and zero-dimension parity passes. Repeated timings separate transfers from resident work. |
 | Numerical operations | Metal compute.go, spatial.go, validation.go | Arithmetic, broadcasting, reductions, all interpolation modes, pooling, finite validation, malformed views, and explicit errors pass. |
 | Inference | nn device paths and Metal gradient tests | Dense, RNN, LSTM, native convolution, normalization, causal attention, positional encoding, Softmax, and transformer forward/backward match CPU. |

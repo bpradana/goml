@@ -18,6 +18,11 @@ Native model tests require macOS, CGo, and a supported Metal device.
 | [training](training/README.md) | GPU linear regression and optional portable checkpoint. |
 | [yolo](yolo/README.md) | Pretrained image detection with resident model weights. |
 
+Each program has a paired `main_test.go`. Matrix tests exercise the runnable
+program; training tests own model gradients, optimizer updates, checkpoints, and
+training benchmarks; YOLO tests own pretrained parity and staged benchmarks.
+There is no shared test package at the examples-module root.
+
 Run test:gpu:parity for model, gradient, optimizer, training, and checkpoint checks.
 Set GOML_YOLO_MODEL to enable pretrained YOLO validation with local bus.jpg and reference-320/reference-640 input files.
 Run bench:gpu:models for complete optimizer steps and staged YOLO measurements.

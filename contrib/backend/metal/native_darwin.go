@@ -10,13 +10,14 @@ package metal
 import "C"
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
+	"strings"
 	"unsafe"
 )
 
-//go:embed kernels.metal
-var shaderSource string
+//go:embed kernels/*.metal
+var shaders embed.FS
 
 func nativeError(status C.int, message *C.char) error {
 	if message != nil {
@@ -33,7 +34,19 @@ func nativeError(status C.int, message *C.char) error {
 }
 
 func nativeOpen(index int) (unsafe.Pointer, string, error) {
-	source := C.CString(shaderSource)
+	var library strings.Builder
+
+	for _, name := range []string{"common", "layout", "arithmetic", "reduction", "spatial"} {
+		source, err := shaders.ReadFile("kernels/" + name + ".metal")
+		if err != nil {
+			return nil, "", fmt.Errorf("metal: load %s shader: %w", name, err)
+		}
+
+		library.Write(source)
+		library.WriteByte('\n')
+	}
+
+	source := C.CString(library.String())
 	defer C.free(unsafe.Pointer(source))
 
 	var message *C.char

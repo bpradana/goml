@@ -14,3 +14,8 @@ mise run example:gpu:training -- -checkpoint /tmp/linear.goml
 The optional checkpoint preserves the existing portable network format.
 It can be loaded on CPU without Metal. The measured run ended below `1e-12` MSE.
 macOS, CGo, and Metal hardware are required.
+
+The paired `main_test.go` covers Dense, convolution, attention, recurrent layers,
+gradient ownership, SGD/Adam updates, CNN convergence, and portable checkpoints.
+It also owns the optimizer-step and resident Dense-backward benchmarks run by
+`mise run bench:gpu:models`.

@@ -14,3 +14,7 @@ mise run example:gpu:yolo -- -model data/yolo/yolov8n.goml -image data/yolo/bus.
 Use `-size 320` for the smaller validated input. The program does not download weights or images.
 Follow the [conversion guide](../../../../nn/yolo/README.md#weight-conversion) for trusted checkpoint setup.
 macOS, CGo, and Metal hardware are required.
+
+The paired `main_test.go` owns pretrained CPU/Metal parity and staged YOLO
+benchmarks. Set `GOML_YOLO_MODEL` to enable those local-asset workloads. The test
+also needs neighboring `bus.jpg` and `reference-320`/`reference-640` input fixtures.

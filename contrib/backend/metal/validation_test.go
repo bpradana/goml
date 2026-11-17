@@ -40,4 +40,6 @@ func TestCheckFinite_RejectsNaNInfinityAndLeavesDeviceUsable(t *testing.T) {
 	}
 }
 
-func TestCheckFinite_Conformance(t *testing.T) { backendtest.RunFinite(t, openDevice(t)) }
+func TestCheckFinite_Conformance(t *testing.T) {
+	backendtest.RunFinite(t, openDevice(t))
+}
