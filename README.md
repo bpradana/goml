@@ -10,7 +10,7 @@
 ![Execution](https://img.shields.io/badge/CPU-amd64%20%C2%B7%20arm64-555)
 ![simdops](https://img.shields.io/badge/simdops-v0.1.0-blue)
 ![tensor](https://img.shields.io/badge/tensor-v0.3.0-blue)
-![nn](https://img.shields.io/badge/nn-v0.5.0-blue)
+![nn](https://img.shields.io/badge/nn-v0.6.0-blue)
 ![yolo](https://img.shields.io/badge/yolo-v0.3.0-blue)
 ![metal](https://img.shields.io/badge/metal-v0.1.0-blue)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -33,7 +33,7 @@ The CPU runtime uses Go and its standard library. Tensors contain `float32` valu
 views share immutable storage, and training uses eager reverse-mode differentiation.
 Default builds use scalar kernels. Go's experimental portable SIMD API is optional.
 
-**Module versions:** simdops v0.1.0, tensor v0.3.0, and nn v0.5.0.
+**Module versions:** simdops v0.1.0, tensor v0.3.0, and nn v0.6.0.
 The nn release includes convolutional, recurrent, transformer, checkpoint, pooling, SiLU, and spatial interpolation APIs.
 The independent [YOLO module](contrib/nn/yolo/README.md) provides pretrained YOLOv8n CPU detection as `contrib/nn/yolo/v0.3.0`.
 See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/README.md) for their APIs and examples.
@@ -86,7 +86,7 @@ From your application's Go module, install the library you need:
 ```sh
 go get github.com/bpradana/goml/simdops@v0.1.0
 go get github.com/bpradana/goml/tensor@v0.3.0
-go get github.com/bpradana/goml/nn@v0.5.0
+go get github.com/bpradana/goml/nn@v0.6.0
 ```
 
 Each command includes that module's dependencies. Go 1.27.3 or later is required.
