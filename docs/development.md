@@ -45,7 +45,7 @@ mise install --locked go uv golangci-lint \
 ## Choose a task
 
 Scoped tasks use `action:target` names.
-Aggregate tasks run the four ordinary CPU module tasks. Metal tasks are explicit and separate.
+Aggregate tasks run the four ordinary CPU module tasks. Metal and WebGPU tasks are explicit and separate.
 
 | Purpose | Aggregate | Module example |
 | --- | --- | --- |
@@ -66,8 +66,10 @@ Specialized checks are separate because they have different costs or prerequisit
 | `test:race` | Runs the Go race detector across all modules. |
 | `test:backend` / `test:backend:cpu` | Checks shared contracts, CPU conformance, Tensor ownership, and the contributor example. |
 | `test:backend:metal` | Runs shared and native Metal tests on supported Apple hardware. |
-| `lint:backend` | Lints Tensor contracts, CPU kernels, examples, and Metal. |
+| `test:backend:webgpu` | Runs shared and native WebGPU tests on a hardware adapter. |
+| `lint:backend` | Lints Tensor contracts, CPU kernels, examples, Metal, and WebGPU. |
 | `bench:backend:cpu` / `bench:backend:metal` | Runs kernel and complete-model benchmarks for the selected backend. |
+| `bench:backend:webgpu` | Measures initialization, transfers, and CPU/device-resident matrix multiplication. |
 | `test:simd` | Tests every module with `GOEXPERIMENT=simd`. |
 | `test:coverage` | Reports package statement coverage. |
 | `test:fuzz` | Runs bounded layout, view, checkpoint-file, and network-metadata fuzz checks. |
@@ -105,6 +107,31 @@ Use bench:gpu:metal for repeated matrix measurements and bench:gpu:models for mo
 The model benchmark needs explicitly supplied local YOLO artifacts. See [GPU measurements](performance/metal.md).
 The manual [Metal workflow](../.github/workflows/metal.yml) requires a self-hosted Mac GPU runner.
 Ordinary CPU CI remains independent of that runner. Standalone dependencies are verified at release time.
+
+## WebGPU development
+
+Native execution requires CGo, a desktop hardware adapter, and the platform's
+native build dependencies. The active workspace includes the independent backend
+and its separate examples module. Browser execution is not implemented.
+
+```sh
+mise run fmt:gpu:webgpu
+mise run fmt:gpu:webgpu:examples
+mise run fmt:check:webgpu
+mise run lint:gpu:webgpu
+mise run lint:gpu:webgpu:examples
+mise run test:gpu:webgpu
+mise run test:gpu:webgpu:race
+mise run test:gpu:webgpu:parity
+mise run test:gpu:webgpu:portable
+```
+
+Hardware tasks require an actual adapter and fail if it is unavailable. The
+portable task checks unsupported stubs with CGo disabled. The manual
+[WebGPU workflow](../.github/workflows/webgpu.yml) uses a self-hosted Mac runner
+labeled `webgpu`. See the [backend guide](../contrib/backend/webgpu/README.md)
+for installation, ownership, and examples, and the
+[validation report](performance/webgpu.md) for measured results.
 
 ## Daily workflow
 

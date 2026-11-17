@@ -25,6 +25,7 @@ flowchart TD
     YOLO --> Tensor
     Core --> Tensor["tensor<br/>arrays, views, mathematics"]
     Tensor --> SIMD["simdops<br/>validated slice operations"]
+    WebGPU["contrib/backend/webgpu<br/>WGSL compute"] --> Contract
     Metal["contrib/backend/metal<br/>native GPU execution"] --> Contract["tensor/backend<br/>capabilities and shared types"]
     Tensor --> Contract
     CPU["tensor/internal/cpu<br/>optimized host kernels"] --> Contract
@@ -41,7 +42,7 @@ flowchart TD
 nn and its subpackages import tensor and never import simdops directly.
 The internal CPU backend imports simdops for contiguous arithmetic.
 CPU execution has no third-party runtime dependencies beyond the three-module chain.
-Metal imports tensor/backend and owns the CGo bridge. Tensor and nn do not import native backends.
+Metal and WebGPU import tensor/backend and own their optional native integration. Tensor and nn do not import native backends.
 
 ## Workspace and versioned modules
 
@@ -58,6 +59,7 @@ The workspace resolves local changes without relative replace directives.
 | [nn/go.mod](../nn/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
 | [contrib/nn/yolo/go.mod](../contrib/nn/yolo/go.mod) | `github.com/bpradana/goml/nn v0.6.0` and `tensor v0.3.0` |
 | [contrib/backend/metal/go.mod](../contrib/backend/metal/go.mod) | `github.com/bpradana/goml/tensor v0.3.0` |
+| [contrib/backend/webgpu/go.mod](../contrib/backend/webgpu/go.mod) | Tensor v0.3.0 and the pinned native WebGPU binding. |
 
 The version declarations target simdops v0.1.0, tensor v0.3.0, and nn v0.6.0.
 Workspace tests use local modules, while standalone checks require published dependencies.

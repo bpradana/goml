@@ -11,6 +11,7 @@ flowchart TD
     T --> B[tensor/backend contracts]
     CPU[tensor/internal/cpu] --> B
     METAL[contrib/backend/metal] --> B
+    WEBGPU[contrib/backend/webgpu] --> B
     T --> CPU
     TEST[tensor/backendtest] --> T
     TEST --> B
@@ -190,4 +191,6 @@ scopes, queued resource retention, and concurrent independent allocations.
 
 See [Extending backends](extending-backends.md) for a compilable MatMul-only example
 and [GPU development](gpu.md) for Metal installation, validation, and benchmarks.
-CUDA and ROCm remain unimplemented source reservations.
+The independent [WebGPU backend](../contrib/backend/webgpu/README.md) implements the
+same capabilities using WGSL and an ordered native WebGPU queue. CUDA and ROCm
+remain unimplemented source reservations.

@@ -24,6 +24,11 @@ Metal implements them. Tensor and nn do not import Metal.
 Metal's runtime module depends only on tensor and indirect simdops.
 The nested Metal examples module supplies nn and YOLO integration workloads without adding those backend dependencies.
 
+The independent [WebGPU backend](../contrib/backend/webgpu/README.md) uses the same
+contracts with embedded WGSL kernels. It supports native hardware adapters through
+wgpu-native; CGo-free and browser builds expose an unsupported stub. Its numerical
+and model validation is recorded in the [WebGPU report](performance/webgpu.md).
+
 ## Tensor migration
 
 | API | Behavior |

@@ -1,5 +1,12 @@
 # Changelog
 
+## WebGPU v0.1.0
+
+- Independent native WebGPU module with persistent Float32 buffers, explicit transfers, safe queued resource ownership, and cached embedded WGSL pipelines.
+- Tiled MatMul, broadcast arithmetic, mathematical functions, reductions, layout operations, native convolution gradients, pooling, and all supported interpolation modes.
+- Shared backend conformance, source-paired tests, GPU model/optimizer parity, portable checkpoints, and explicit local YOLO validation.
+- Backend README, matching geometric SVG logo, model examples, mise tasks, and opt-in hardware CI.
+
 ## nn v0.6.0 and contrib/nn/yolo v0.3.1
 
 - `Value.Detach()` returns `(*Value, error)` with an independent unscoped tensor handle, preserving constants across parameter updates and source closure without copying data.

@@ -41,6 +41,8 @@ See the [layer guide](docs/layers.md) and [checkpoint contract](nn/checkpoint/RE
 The optional [Metal backend](contrib/backend/metal/README.md) adds persistent GPU tensors,
 native matrix multiplication and convolution, GPU training, and YOLOv8n on Apple Silicon.
 It owns all CGo and Apple framework integration. CPU applications retain their existing installation path.
+The optional [WebGPU backend](contrib/backend/webgpu/README.md) supplies WGSL computation
+through native WebGPU adapters, with its own buffers, numerical kernels, and examples.
 These release targets require upstream publication in the [documented order](docs/releasing.md).
 
 ## Contents
@@ -145,6 +147,9 @@ flowchart TD
     Optimizer["nn/optimizer · parameter updates"] --> NN
     YOLO["contrib/nn/yolo · pretrained detection"] --> NN
     NN --> Tensor["tensor · immutable numerical arrays"]
+    Tensor --> Contract["tensor/backend · device capabilities"]
+    Metal["contrib/backend/metal"] --> Contract
+    WebGPU["contrib/backend/webgpu"] --> Contract
     Tensor --> SIMD["simdops · scalar and optional SIMD kernels"]
     SIMD --> Std["Go standard library"]
 ```
@@ -155,6 +160,8 @@ flowchart TD
 | tensor | `github.com/bpradana/goml/tensor` | [Arrays, views, and mathematics](tensor/README.md) |
 | nn | `github.com/bpradana/goml/nn` | [Differentiation and model training](nn/README.md) |
 | yolo | `github.com/bpradana/goml/contrib/nn/yolo` | [Pretrained object detection](contrib/nn/yolo/README.md) |
+| metal | `github.com/bpradana/goml/contrib/backend/metal` | [Apple Metal execution](contrib/backend/metal/README.md) |
+| webgpu | `github.com/bpradana/goml/contrib/backend/webgpu` | [Native WebGPU and WGSL](contrib/backend/webgpu/README.md) |
 
 Each module has its own `go.mod`. The root `go.work` selects local versions.
 Layer, loss, and optimizer packages belong to the nn module. They do not create
@@ -178,6 +185,7 @@ additional modules. There is no root `go.mod`.
 | `nn/checkpoint/` | Checked weight files and complete built-in network persistence. |
 | `nn/examples/` | Generated-data training examples and local-data MNIST. |
 | `contrib/nn/yolo/` | Independent YOLOv8n inference, model archives, and offline conversion. |
+| `contrib/backend/` | Optional Metal/WebGPU execution and unimplemented CUDA/ROCm reservations. |
 | `docs/` | Architecture, contracts, development, validation, and releases. |
 | `.github/workflows/` | Quality, SIMD, converter checks, benchmarks, and module release notes. |
 

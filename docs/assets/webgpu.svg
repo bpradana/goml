@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" role="img" aria-label="webgpu">
+  <title>webgpu</title>
+  <desc>A violet compute mesh connects three shader tiles with cyan numerical lanes.</desc>
+  <path d="m48 8 34 20v40L48 88 14 68V28Z" fill="#30284c" stroke="#b39ae5" stroke-width="3" stroke-linejoin="round"/>
+  <g fill="none" stroke="#8066b4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M48 8v20M14 28l34 20 34-20M14 68l16-8m36 0 16 8M48 48v40"/>
+    <path d="m48 28-18 32h36Z"/>
+  </g>
+  <g stroke-width="3" stroke-linejoin="round">
+    <rect x="39" y="19" width="18" height="18" rx="2" fill="#d8c8f4" stroke="#d8c8f4"/>
+    <rect x="21" y="51" width="18" height="18" rx="2" fill="#9b80cf" stroke="#b39ae5"/>
+    <rect x="57" y="51" width="18" height="18" rx="2" fill="#087e9c" stroke="#38d9e8"/>
+  </g>
+  <g fill="none" stroke-width="2" stroke-linecap="round">
+    <path d="M44 25h8m-8 6h8" stroke="#584174"/>
+    <path d="M26 57h8m-8 6h8" stroke="#30284c"/>
+    <path d="M62 57h8m-8 6h8" stroke="#38d9e8"/>
+  </g>
+</svg>

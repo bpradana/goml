@@ -267,3 +267,32 @@ The public Go proxy can still cache an earlier failed lookup temporarily.
 
 GitHub documents [tag triggers](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push)
 and the [release API](https://docs.github.com/en/rest/releases/releases#create-a-release).
+
+## WebGPU release
+
+The initial target is `contrib/backend/webgpu/v0.1.0`, requiring Tensor v0.3.0 and
+the pinned WebGPU binding. Its separate examples module has no release tag and
+uses workspace resolution until the new backend is published. CUDA and ROCm
+remain unimplemented and are not release targets.
+
+Run native checks on supported hardware before creating the tag:
+
+```sh
+mise run fmt:check:webgpu
+mise run lint:gpu:webgpu
+mise run lint:gpu:webgpu:examples
+mise run test:gpu:webgpu:standalone
+mise run test:gpu:webgpu:race
+mise run test:gpu:webgpu:parity
+mise run test:gpu:webgpu:parity:race
+mise run test:gpu:webgpu:portable
+```
+
+Configure a self-hosted macOS arm64 runner labeled webgpu before publication.
+The module tag triggers native verification and module-specific release notes.
+Do not describe successful unsupported stubs as hardware validation.
+
+After publication, add the actual backend version to the examples module, tidy
+its dependencies, and verify it with GOWORK disabled. Do not invent an unpublished
+module checksum or add a committed relative replace directive. Existing published
+tags remain unchanged.
