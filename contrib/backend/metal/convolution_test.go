@@ -5,6 +5,8 @@ package metal_test
 import (
 	"testing"
 
+	"github.com/bpradana/goml/contrib/backend/metal"
+
 	"github.com/bpradana/goml/tensor"
 	"github.com/bpradana/goml/tensor/backendtest"
 )
@@ -56,4 +58,107 @@ func TestConvolution_Conformance(t *testing.T) {
 	device := openDevice(t)
 	backendtest.RunConvolution(t, device)
 	backendtest.RunConvolutionBackward(t, device)
+}
+
+func BenchmarkConvolutionResident(b *testing.B) {
+	device, err := metal.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = device.Close() }()
+
+	hostInput, err := tensor.Ones(1, 8, 32, 32)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	input, err := hostInput.To(device)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = input.Close() }()
+
+	hostWeight, err := tensor.Ones(72, 16)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	weight, err := hostWeight.To(device)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = weight.Close() }()
+
+	hostGradient, err := tensor.Ones(1, 16, 32, 32)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	gradient, err := hostGradient.To(device)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = gradient.Close() }()
+
+	warm, err := tensor.Conv2D(input, weight, nil, 3, 1, 1)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	dx, dw, err := tensor.Conv2DBackward(input, weight, gradient, 3, 1, 1)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	if err := device.Synchronize(); err != nil {
+		b.Fatal(err)
+	}
+
+	_ = warm.Close()
+	_ = dx.Close()
+	_ = dw.Close()
+
+	b.Run("forward", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			output, err := tensor.Conv2D(input, weight, nil, 3, 1, 1)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if err := device.Synchronize(); err != nil {
+				b.Fatal(err)
+			}
+
+			if err := output.Close(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("backward", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			dx, dw, err := tensor.Conv2DBackward(input, weight, gradient, 3, 1, 1)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if err := device.Synchronize(); err != nil {
+				b.Fatal(err)
+			}
+
+			if err := dx.Close(); err != nil {
+				b.Fatal(err)
+			}
+
+			if err := dw.Close(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }

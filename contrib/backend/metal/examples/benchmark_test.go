@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"image"
 	_ "image/jpeg"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/bpradana/goml/nn"
+	"github.com/bpradana/goml/nn/layer"
+
 	"github.com/bpradana/goml/contrib/backend/metal"
 	"github.com/bpradana/goml/contrib/nn/yolo"
-	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
 )
@@ -331,5 +334,85 @@ func BenchmarkYOLO(b *testing.B) {
 				}
 			})
 		})
+	}
+}
+
+func BenchmarkDenseBackwardResident(b *testing.B) {
+	device, err := metal.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = device.Close() }()
+
+	model, err := layer.NewDense(64, 32, true, rand.New(rand.NewPCG(1, 2)))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	if err := nn.ToDevice(model.Parameters(), device); err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		for _, parameter := range model.Parameters() {
+			_ = parameter.Value().Data().Close()
+		}
+	}()
+
+	host, err := tensor.Ones(32, 64)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	resident, err := host.To(device)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = resident.Close() }()
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		scope, err := tensor.NewScope(device)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		data, err := scope.To(resident)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		input, err := nn.NewValue(data, false)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		output, err := model.Forward(input)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		squared, err := nn.Mul(output, output)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		objective, err := nn.Mean(squared)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		if err := objective.Backward(); err != nil {
+			b.Fatal(err)
+		}
+
+		for _, parameter := range model.Parameters() {
+			parameter.ZeroGrad()
+		}
+
+		if err := scope.Close(); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

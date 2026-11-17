@@ -213,3 +213,72 @@ func TestDevice_Conformance(t *testing.T) {
 	backendtest.RunDevice(t, device)
 	backendtest.RunShutdown(t, device)
 }
+
+func BenchmarkDeviceLifecycle(b *testing.B) {
+	b.Run("context_startup", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			device, err := metal.Open()
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if err := device.Close(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	device, err := metal.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = device.Close() }()
+
+	b.Run("allocate_release_4096", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			buffer, err := device.Allocate(4096)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			if err := buffer.Close(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	buffer, err := device.Allocate(4096)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = buffer.Close() }()
+
+	values := make([]float32, 4096)
+
+	b.Run("upload_4096", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(values)) * 4)
+
+		for b.Loop() {
+			if err := device.Upload(buffer, values); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("download_4096", func(b *testing.B) {
+		b.ReportAllocs()
+		b.SetBytes(int64(len(values)) * 4)
+
+		for b.Loop() {
+			if err := device.Download(buffer, values); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}
