@@ -1,0 +1,32 @@
+name: WebGPU
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webgpu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: [self-hosted, macOS, ARM64, webgpu]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5
+        with:
+          version: 2026.8.15
+          install_args: "--locked"
+      - run: mise run fmt:check:webgpu
+      - run: mise run build:gpu:webgpu
+      - run: mise run lint:gpu:webgpu
+      - run: mise run lint:gpu:webgpu:examples
+      - run: mise run test:gpu:webgpu
+      - run: mise run test:gpu:webgpu:parity
+      - run: mise run test:gpu:webgpu:race
+      - run: mise run test:gpu:webgpu:parity:race
+      - run: mise run test:gpu:webgpu:portable
