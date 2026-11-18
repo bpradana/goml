@@ -20,7 +20,8 @@ run = [
   { task = "build:data" },
   { task = "build:metrics" },
   { task = "build:trainer" },
-  { task = "build:mnist" }
+  { task = "build:mnist" },
+  { task = "build:example" }
 ]
 
 [tasks."build:simdops"]
@@ -57,7 +58,8 @@ run = [
   { task = "test:data" },
   { task = "test:metrics" },
   { task = "test:trainer" },
-  { task = "test:mnist" }
+  { task = "test:mnist" },
+  { task = "test:example" }
 ]
 
 [tasks."test:simdops"]
@@ -85,7 +87,8 @@ run = [
   { task = "lint:data" },
   { task = "lint:metrics" },
   { task = "lint:trainer" },
-  { task = "lint:mnist" }
+  { task = "lint:mnist" },
+  { task = "lint:example" }
 ]
 
 [tasks."lint:simdops"]
@@ -167,7 +170,8 @@ run = [
   { task = "fmt:data" },
   { task = "fmt:metrics" },
   { task = "fmt:trainer" },
-  { task = "fmt:mnist" }
+  { task = "fmt:mnist" },
+  { task = "fmt:example" }
 ]
 
 [tasks."fmt:simdops"]
@@ -187,7 +191,7 @@ run = ["golangci-lint fmt ./...", "golangci-lint run --enable-only wsl_v5 --fix 
 
 [tasks."fmt:check"]
 description = "Check Go formatting"
-run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
+run = "files=$(golangci-lint fmt --diff ./simdops/... ./tensor/... ./nn/... ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/... ./example/...) && test -z \"$files\" || { printf \"%s\\n\" \"$files\"; exit 1; }"
 
 [tasks."test:race"]
 description = "Run race detector"
@@ -223,7 +227,7 @@ run = [
   "go vet ./simdops/...",
   "go vet ./tensor/...",
   "go vet ./nn/...",
-  "go vet ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/..."
+  "go vet ./contrib/nn/yolo/... ./data/... ./metrics/... ./trainer/... ./nn/examples/mnist/... ./example/..."
 ]
 
 [tasks."security:vuln"]
@@ -950,3 +954,28 @@ run = "go test -tags metal -run '^$' -bench='^BenchmarkLossReadback_Metal$' -ben
 [tasks."bench:trainer:readback:webgpu"]
 dir = "nn/examples/mnist"
 run = "go test -tags webgpu -run '^$' -bench='^BenchmarkLossReadback_Webgpu$' -benchmem -benchtime=5x -count=3"
+
+[tasks."build:example"]
+dir = "example"
+run = "go build -o /dev/null ."
+
+[tasks."test:example"]
+dir = "example"
+run = "go test ./..."
+
+[tasks."test:example:metal"]
+description = "Verify CIFAR CNN training, CPU parity, and cleanup on native Metal"
+dir = "example"
+run = "go test -tags metal -race ./..."
+
+[tasks."lint:example"]
+dir = "example"
+run = "golangci-lint run --build-tags metal ./..."
+
+[tasks."fmt:example"]
+dir = "example"
+run = ["for file in *.go; do golangci-lint fmt --stdin < \"$file\" > \"$file.tmp\" && mv \"$file.tmp\" \"$file\" || exit 1; done", "golangci-lint run --build-tags metal --enable-only wsl_v5 --fix ./..."]
+
+[tasks."example:cifar10"]
+dir = "example"
+run = "go run ."

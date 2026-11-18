@@ -143,6 +143,9 @@ See the [example guide](nn/examples/README.md) for model shapes, tasks, and conv
 
 The seeded XOR example trains a 2 → 8 → 1 network for 1,000 Adam steps.
 Its convergence check requires every prediction to be within 0.1 of its target.
+The [CIFAR-10 Metal application](example/README.md) trains an 89,834-parameter CNN
+on 10,000 real color images, with separate validation, portable checkpoints,
+held-out test evaluation, and image prediction. It has its own `example/go.mod`.
 The [MNIST example](nn/examples/mnist/README.md) reads explicitly downloaded local
 IDX files. Ordinary tests do not download datasets.
 
