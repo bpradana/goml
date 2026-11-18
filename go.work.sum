@@ -2,7 +2,7 @@ github.com/bpradana/goml/contrib/backend/metal v0.1.0/go.mod h1:YGDv4UFTzjsyNH5Z
 github.com/bpradana/goml/contrib/backend/webgpu v0.1.0/go.mod h1:vsZyjNQBBNhdZbsMh/oHYtIWEKhUr/Ny6jMEX+bzc6s=
 github.com/bpradana/goml/contrib/nn/yolo v0.3.0/go.mod h1:nHjPq0zSsftY9+i63kVW9MqrFMnIRxI1TcF62mCcnSk=
 github.com/bpradana/goml/contrib/nn/yolo v0.3.1/go.mod h1:dOAyiqMJkOeqHge7PUrcnpmb0Zg7UHDfv/NCIa7KaR0=
-github.com/bpradana/goml/data v0.1.0/go.mod h1:9KoDz2xv2Wlj2x6L2uUhywLtJVSBODCBWw1DX1iXVug=
+github.com/bpradana/goml/metrics v0.2.0/go.mod h1:HhI92ACnmSy4MUBrx0kn+RFdqG5yoKv4MUEaQk7jisU=
 github.com/bpradana/goml/nn v0.5.0/go.mod h1:8MatLrUzKzj+Qn4F8kK+KR3z74iW+TdmidA+Ry20oB0=
 github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf h1:F3qluraUahVF1QyZcPaeqavaUMr65eQnR4AH4VmDojc=
 github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
