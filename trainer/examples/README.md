@@ -6,6 +6,7 @@
 | --- | --- |
 | [Classification](classification/README.md) | Seeded toy classifier, validation metrics, and callbacks. |
 | [Regression](regression/README.md) | Adam, linear regression, and a pluggable custom metric. |
+| [Objective](objective/README.md) | Replace a built-in loss with a composite denoising objective. |
 | [Custom](custom/README.md) | A typed reconstruction step with a custom objective. |
 | [MNIST](../../nn/examples/mnist/README.md) | Dense/CNN training and checkpoint workflows with explicit CPU or GPU selection. |
 

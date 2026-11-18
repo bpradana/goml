@@ -16,4 +16,11 @@ This path supports application-specific tasks without changing Dataset,
 DataLoader, Tensor, NeuralNet, or a global task registry. Custom evaluation metrics
 can remain in application-owned typed accumulators and be read in OnEpochEnd.
 
+
+If your task only changes a loss, prefer the
+[configured objective example](../objective/README.md). It reuses the built-in
+batch lifecycle; generic Fit remains for tasks that need arbitrary batches or
+custom forwards/gradients. Generic best-checkpoint saving uses SaveBest alongside
+BestCheckpointPath and a validation source.
+
 Licensed under [MIT](../../../LICENSE).

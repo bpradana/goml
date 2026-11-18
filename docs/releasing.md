@@ -324,9 +324,23 @@ acquire a data or Metal runtime dependency.
 
 ## Metrics and Trainer
 
-Metrics v0.1.0 is independently published and has no goml dependencies. Trainer
-uses data v0.1.0, metrics v0.1.0, nn v0.6.0, and tensor v0.3.0. Verify with
-`mise run test:standalone:trainer` before tagging its first release. Trainer is
-currently local and untagged. The MNIST application remains workspace-based until
-Trainer has a published version; then add that actual requirement and run its
-standalone tidy/test tasks. Do not move any existing module tags.
+Published Metrics v0.1.0 and Trainer v0.1.0 tags remain unchanged. The extensibility
+changes target Metrics v0.2.0 and Trainer v0.2.0. These are release candidates,
+not published dependencies. No new tags or dependency checksums are fabricated.
+
+1. Run standalone Metrics tests and publish its new version after review.
+2. Update Trainer's Metrics requirement to that real published version and tidy
+   with GOWORK=off. This makes JSON-safe nested regression reports available to
+   external Trainer consumers, not only workspace users.
+3. Run standalone Trainer tests, public examples, CPU CI, and native device tasks.
+4. Publish the new Trainer version. Its original constructors remain supported.
+5. Update the separate MNIST application's Trainer requirement to the published
+   compatible version, tidy, and run its standalone tests including optional tags.
+
+Until then, Trainer retains its actual published Metrics v0.1.0 requirement.
+Standalone Trainer checks validate the new loss/checkpoint APIs against that
+version, but do not establish the new Metrics JSON behavior for nested reports.
+The workspace validates the new Metrics and Trainer sources together. The
+MNIST development application uses workspace Trainer for its new integration tests.
+Release automation already recognizes independent Metrics and Trainer tags.
+Do not commit relative replace directives or move existing published tags.

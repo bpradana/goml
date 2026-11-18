@@ -66,6 +66,12 @@ Metric[P,T,R] additionally exposes a typed Result. Trainer consumes only the
 update/reset boundary; users retain their concrete result type.
 
 ```go
+type BiasEpoch struct {
+	Epoch int
+	Result meanbias.Result
+}
+
+var biasHistory []BiasEpoch
 custom := meanbias.New()
 runner, err := trainer.NewRegressor(model, opt, device, custom)
 if err != nil {
@@ -80,6 +86,7 @@ history, err := runner.Fit(ctx, train, validation, trainer.FitOptions{
 			return err
 		}
 
+		biasHistory = append(biasHistory, BiasEpoch{Epoch: report.Epoch, Result: result})
 		fmt.Println(report.Epoch, result.MeanBias)
 		return nil
 	},
@@ -157,3 +164,33 @@ mise run test:trainer:webgpu
 
 The last two commands require actual supported hardware. See
 [measurements](performance/trainer.md) for the executed workloads and limits.
+
+## Configured loss and custom serialization
+
+NewClassifierWithConfig accepts ClassifierConfig{Classes, Loss};
+NewRegressorWithConfig accepts RegressorConfig{Loss}. Loss reuses the existing
+nn/loss.Loss target interface. Nil selects the existing cross-entropy/MSE default.
+Existing constructors continue to work. Custom losses return owned differentiable
+scalars on the selected device, with sample-mean reduction and scope propagation.
+Validation uses that same objective; early stopping and best-model selection
+therefore monitor it, while accuracy and regression metrics retain their definitions.
+The optimizer-free top-level evaluation functions keep their default losses.
+
+FitOptions.SaveBest overrides the built-in serializer when BestCheckpointPath
+is set. Generic Fit now supports this combination too. SaveBest without a path,
+checkpointing without validation, or generic checkpointing without a saver are
+errors before iteration. The saver owns file integrity and atomicity, borrows the
+model, and runs before OnEpochEnd only on strict improvements. Failure stops Fit
+without advancing the best-saved loss or invoking that epoch callback. Another
+Fit starts fresh selection state; there is no automatic retry or model restore.
+
+The [denoising example](../trainer/examples/objective/README.md) implements two
+loss terms through a configured Regressor. It uses ordinary regression batches,
+one forward pass, and normal gradients, so all lifecycle code remains in Trainer.
+The existing generic example still covers arbitrary typed batches. Neither use
+case requires splitting Model or adding a universal task/scope wrapper.
+
+Custom training metrics remain a separate concern. No training logits are
+downloaded unless the application explicitly does so in a custom step. The
+[synchronization experiment](performance/trainer.md#loss-readback-investigation)
+measures deferred scalar reads; it does not change loss reporting or error checks.

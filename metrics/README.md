@@ -141,4 +141,18 @@ See [measurements](../docs/performance/metrics.md) for sizes and limitations.
 
 [Metric conventions](../docs/metrics.md) · [Releases](../docs/releasing.md)
 
+## JSON regression reports
+
+The development RegressionResult implements MarshalJSON using encoding/json.
+Existing field names (Count, MAE, MSE, RMSE, R2, R2Valid) are preserved. Undefined
+R² becomes `"R2":null` and `"R2Valid":false`; the Go value remains NaN with the
+same validity flag. Valid negative R² is serialized normally. Other nonfinite
+fields, or R2 marked valid but nonfinite, still return encoding errors.
+
+Run `mise run example:metrics:regression` for numerical and JSON output. This
+serialization fix requires the next Metrics release; published v0.1.0 retains
+its original behavior. No numerical accumulation or generic interface changed.
+Typed application histories are demonstrated by the
+[Trainer regression example](../trainer/examples/regression/main.go).
+
 Licensed under [MIT](../LICENSE).

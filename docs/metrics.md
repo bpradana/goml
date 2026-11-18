@@ -79,3 +79,19 @@ implements the public interface with a concrete report type. The
 that exact implementation and passes it directly to NewRegressor. See
 [pluggable metrics](training.md#plug-in-custom-metrics) for reset, borrowing,
 error, and per-epoch snapshot behavior.
+
+## Serialize undefined R²
+
+RegressionResult.MarshalJSON keeps the existing exported field names and emits
+R2 as JSON null whenever R2Valid is false. The original Go R2 remains NaN; no
+undefined result is silently converted to zero. Valid negative scores are
+preserved. Other nonfinite report fields still cause an encoding/json error.
+The [regression example](../metrics/examples/regression/main.go) prints a
+single-observation result in this form. This is a development change after
+v0.1.0; install the subsequent Metrics release to use it outside the workspace.
+
+The generic contracts also accept application-defined prediction/target structs
+and report types, as verified in the external-package metric_test.go. There is
+no Tensor, NeuralNet, or Trainer dependency in Metrics. Applications can append
+their concrete Result snapshots in OnEpochEnd, as shown in the runnable Trainer
+regression example, without storing prediction arrays or adding a metric registry.

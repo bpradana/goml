@@ -22,9 +22,10 @@ batch gets explicit device transfers, eager backpropagation, optimizer updates,
 gradient clearing, and immediate temporary cleanup. Evaluation uses Predict
 without an autograd graph or optimizer updates.
 
-The module is `github.com/bpradana/goml/trainer`, with an initial release target
-of `trainer/v0.1.0`. During development, use the committed Go workspace. Its
-versioned dependencies are published; Trainer itself remains untagged.
+The module is `github.com/bpradana/goml/trainer`; v0.1.0 is published.
+The configurable-loss and SaveBest APIs below are additive development changes
+for the next release. Use the committed workspace for them until publication.
+Existing constructors and generic Fit signatures remain available.
 The core imports no concrete GPU backend and compiles without CGo.
 
 ## Quick start
@@ -63,6 +64,38 @@ For regression, use `NewRegressor(model, opt, device)` with the same Fit pattern
 Predictions and targets must have exactly equal shapes, including the leading
 sample dimension. Loss is weighted by sample count, including partial batches.
 Regression metrics flatten outputs into equally weighted scalar observations.
+
+## Custom losses
+
+NewClassifier and NewRegressor preserve their original cross-entropy/MSE defaults.
+Use the additive constructors to replace only the differentiable objective:
+
+```go
+runner, err := trainer.NewRegressorWithConfig(model, opt, device,
+	trainer.RegressorConfig{Loss: myLoss}, bias)
+if err != nil {
+	return err
+}
+```
+
+ClassifierConfig has Classes and Loss of type `loss.Loss[[]int]`;
+RegressorConfig.Loss is `loss.Loss[*nn.Value]`. These reuse nn/loss's existing
+interface. Nil Loss selects the default. The supplied implementation is borrowed,
+returns an owned scalar on the selected device, propagates Tensor scopes and
+backward dependencies, and must not mutate parameters or retain target slices.
+Return a mean over samples. For fixed-size multi-output regression, average
+output elements within each sample, then average samples; an unnormalized sum
+would give incorrect sample-weighted epoch loss.
+
+Training and runner.Evaluate use the same configured loss. Early stopping and
+best-checkpoint selection monitor that objective. Built-in accuracy/MSE/etc.
+retain their ordinary definitions, so validation MeanLoss can differ from MSE.
+The optimizer-free EvaluateClassification/EvaluateRegression functions retain
+their default objectives; use runner.Evaluate for a configured loss. Nil, closed,
+foreign-device, non-scalar, or nonfinite loss outputs return errors before Step.
+
+The [denoising example](examples/objective/README.md) combines reconstruction and
+regularization without reimplementing any batch lifecycle code.
 
 ## Pluggable metrics
 
@@ -138,7 +171,25 @@ Sequential checkpoints contain supported architecture and weights; custom Model
 implementations use weights-only checkpoints. Unsupported architecture codecs
 return errors. The best model is not restored automatically.
 
-Checkpoints do not include optimizer moments or step counters. They are not full
+An optional `SaveBest func(path string) error` overrides serialization in either
+built-in trainer, and enables best-checkpoint selection in generic Fit. A path
+and validation source are required; SaveBest without a path is rejected. The
+saver runs synchronously before OnEpochEnd and borrows the model. It is responsible
+for atomic writing/file integrity and must not close the model. A save failure
+stops Fit, leaves the best-saved loss unchanged, and skips OnEpochEnd for that
+epoch. There is no automatic retry inside a failed run; another Fit starts a new
+selection history. The built-in atomic checkpoint fallback is unchanged.
+
+```go
+options := trainer.FitOptions{
+	Epochs:             100,
+	BestCheckpointPath: "archive/best.custom",
+	SaveBest:           model.Save,
+}
+```
+
+Here model.Save is an application-defined method, not part of Trainer's Model
+interface. Checkpoints do not include optimizer moments or step counters. They are not full
 training-state snapshots. Callback and checkpoint failures return errors without
 rolling back parameter updates already completed.
 
@@ -174,8 +225,9 @@ for arbitrary data.Loader batches and losses. A step returns a finite MeanLoss
 and positive Samples count. It owns its batch, numerical operations, temporary
 resources, and gradient cleanup, even when the context is canceled. The
 [regularized reconstruction example](examples/custom/README.md) demonstrates this
-without a task registry or a universal batch type. Save custom checkpoints from
-OnEpochEnd; generic Fit has no model from which to infer a checkpoint.
+without a task registry or a universal batch type. Set BestCheckpointPath and
+SaveBest for custom model selection; generic Fit
+has no built-in serializer.
 
 ## Examples
 
@@ -183,6 +235,7 @@ OnEpochEnd; generic Fit has no model from which to infer a checkpoint.
 | --- | --- |
 | [Classification](examples/classification/README.md) | Seeded two-class training with validation and progress callbacks. |
 | [Regression](examples/regression/README.md) | Synthetic linear regression, Adam, and a custom mean-bias metric. |
+| [Custom objective](examples/objective/README.md) | Denoising with reconstruction and regularization through a configured loss. |
 | [Custom step](examples/custom/README.md) | Regularized reconstruction with an arbitrary Tensor batch. |
 | [MNIST](../nn/examples/mnist/README.md) | Local MNIST, dense/CNN choices, held-out evaluation, checkpoints, and optional GPU execution. |
 

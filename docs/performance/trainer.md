@@ -118,9 +118,92 @@ mise run bench:mnist
 mise run build:trainer:portable
 ```
 
-Full real-MNIST epoch time, held-out accuracy, maximum Go heap/RSS, and accelerator
-training throughput were not measured for this change. Native checks validate
-small actual hardware workloads without claiming a GPU speedup. There is no new
+Full real-MNIST epoch time, held-out accuracy, and maximum Go heap/RSS were not
+measured. The initial native checks above validate small actual hardware workloads;
+the subsequent readback investigation measures throughput for one synthetic workload. There is no new
 pool, unsafe ownership, worker goroutine, or hidden fallback to improve numbers.
-The separate MNIST application uses workspace Trainer until its first release;
+The separate MNIST application uses workspace Trainer for development APIs;
 Trainer's library module itself passes independent dependency checks.
+
+## Loss readback investigation
+
+Measured on 2026-11-18, Apple M1 Pro, Go 1.27.3, eight Go processors. The baseline
+for source changes is 71dfb08. No native numerical kernels or optimizer algorithms
+were changed. The benchmark builds an identical seeded Dense 64→10 classifier
+for each timed epoch, SGD 0.01, 256 deterministic samples, and eight CPU-collated
+batches of 32. Initialization/device opening, shader startup, model upload, weight
+comparison, and final resource destruction are outside timing. Input transfers,
+forward/backward, updates, scalar reporting, and a final queue barrier are inside.
+No validation or shuffling is enabled in any variant.
+
+Each epoch checks mean loss and final weights against an independently run
+Trainer control to absolute tolerance 1e-6. That control does not depend on which
+benchmark subcase is selected. Native live-buffer counters return to zero after
+each epoch's model cleanup. Medians of three samples, five timed epochs each:
+
+| Device | Variant | Epoch ms | Samples/s | Go bytes/epoch | Allocations/epoch |
+| --- | --- | ---: | ---: | ---: | ---: |
+| CPU | Trainer | 0.380 | 673,389 | 365,137 | 1,643 |
+| CPU | Manual, read each batch | 0.440 | 581,444 | 364,547 | 1,616 |
+| CPU | Manual, read at epoch end | 0.377 | 679,406 | 365,528 | 1,628 |
+| Metal | Trainer | 17.353 | 14,753 | 417,840 | 3,525 |
+| Metal | Manual, read each batch | 21.081 | 12,144 | 417,361 | 3,505 |
+| Metal | Manual, read at epoch end | 14.330 | 17,864 | 418,336 | 3,517 |
+| WebGPU | Trainer | 64.582 | 3,964 | 472,651 | 4,324 |
+| WebGPU | Manual, read each batch | 63.400 | 4,038 | 472,060 | 4,297 |
+| WebGPU | Manual, read at epoch end | 58.364 | 4,386 | 473,809 | 4,269 |
+
+CPU timings are noisy (the per-batch manual samples span 0.348–0.615 ms).
+Metal Trainer samples span 15.544–20.391 ms. These short sequential trials show a
+candidate synchronization cost, not a general device speedup or a statistically
+established orchestration regression. This small workload is much faster on CPU.
+
+The manual controls time HostData calls directly. Summed readback medians per
+epoch are CPU 0.001717/0.001099 ms, Metal 3.775700/0.006267 ms, and WebGPU
+15.575109/11.638166 ms for per-batch/end-of-epoch reads respectively. Trainer's
+individual reads are not instrumented. The final explicit barrier costs less than
+0.002 ms in all samples; it excludes earlier synchronization. In particular,
+existing deviceSGD synchronizes every Step before committing parameter updates.
+Deferred scalar reads therefore do not make the whole epoch asynchronous.
+
+Metal/WebGPU sampled live Float32 payload is 2,600 bytes after ordinary batch
+cleanup and 2,632 with eight retained scalar losses. These samples exclude
+in-operation temporary peaks, driver/library memory, and pending native retention.
+CPU's zero native-byte counter is not a Go heap measurement. There are no raw
+logs, profiler files, trained weights, or benchmark binaries in the repository.
+
+The deferred control retains only eight independent scalar leases, closes them
+after reading, and checks every loss for finiteness. However, those checks happen
+**after parameter updates**. A nonfinite objective would violate Trainer's current
+fail-before-Step contract. The experiment remains test-only: no reporting-frequency
+option, delayed validation, training-logit download, worker, or buffering system
+was added to production. EpochStats.MeanLoss and error timing remain unchanged.
+Further on-device loss accumulation must preserve both safeguards before adoption.
+
+```sh
+mise run bench:trainer:readback:cpu
+mise run bench:trainer:readback:metal
+mise run bench:trainer:readback:webgpu
+```
+
+## Extensibility verification
+
+The new configured-loss tests exercise typed targets, training/validation reuse,
+scalar/device checks, nil/nonfinite outputs, backward dependencies, cleanup, and
+no optimizer update after a loss failure. Custom checkpoint tests cover strict
+selection, override of unsupported Sequential codecs, generic Fit, callback
+ordering/errors, fresh-run retry, weights-only fallback, and invalid configuration.
+Existing checkpoint and early-stopping tests remain in the suite.
+
+The denoising example uses a configured two-term objective without a new lifecycle
+helper. The generic reconstruction example still demonstrates arbitrary batches.
+Custom mean-bias histories remain concrete application-owned snapshots. Metrics
+checks include custom prediction/target/report types and JSON null for undefined
+R² without changing numerical values or streaming interfaces.
+
+The existing 200 ms toy benchmarks were repeated before/after this refactor
+(three samples each). Median classification Fit changed from 15.303 to 15.461 µs,
+and Evaluate from 5.738 to 5.757 µs. Fit still allocates 11,624 bytes/301 objects;
+Evaluate still allocates 4,752 bytes/121 objects. The after-change Fit samples
+span 15.125–21.281 µs, so these observations do not establish a timing regression.
+No per-element dispatch, extra prediction readback, or runtime worker was added.

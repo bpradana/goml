@@ -44,3 +44,14 @@ Large class matrices, native amd64 execution, and statistically rigorous
 cross-machine comparisons were not measured. Invalid-input checks and atomic
 validation are included in update timing. No numerical shortcut, global pool,
 unsafe ownership, or internal parallelism was added to improve these numbers.
+
+## Extensibility and JSON follow-up
+
+On 2026-11-18 the 71dfb08 baseline and updated source were measured with the same
+three 200 ms sample tasks on M1 Pro/Go 1.27.3. Median UpdateLogits was 5.487 µs
+before and 5.501 µs after; Regression.Update was 11.007 µs before and 10.989 µs
+after. Both still allocate zero bytes and zero objects per update. MarshalJSON
+runs only when serializing a report and does not change accumulator state or
+its numerical update path. The small timing changes are within sampled noise.
+The new serialization tests cover constant targets, a single observation, valid
+negative R², unchanged fields, and rejection of unrelated nonfinite fields.
