@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -30,6 +31,25 @@ func run() error {
 	}
 
 	fmt.Printf("mae=%.4f mse=%.4f rmse=%.4f r2=%g valid=%t\n", result.MAE, result.MSE, result.RMSE, result.R2, result.R2Valid)
+
+	// JSON-safe undefined R² keeps the numerical NaN/validity contract in Go.
+	metric.Reset()
+
+	if err := metric.Update([]float32{2}, []float32{1}); err != nil {
+		return err
+	}
+
+	undefined, err := metric.Result()
+	if err != nil {
+		return err
+	}
+
+	encoded, err := json.Marshal(undefined)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(encoded))
 
 	return nil
 }

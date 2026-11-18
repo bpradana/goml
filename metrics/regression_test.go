@@ -1,6 +1,8 @@
 package metrics_test
 
 import (
+	"bytes"
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -135,6 +137,71 @@ func BenchmarkRegression_Update(b *testing.B) {
 	for b.Loop() {
 		if err := metric.Update(predictions, targets); err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+func TestRegressionResult_JSONPreservesNumericsAndNullUndefinedR2(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		predictions, targets []float32
+		valid                bool
+		r2                   float64
+	}{
+		{"perfect", []float32{1, 2}, []float32{1, 2}, true, 1},
+		{"negative", []float32{0, 0}, []float32{1, 2}, true, -9},
+		{"constant", []float32{2, 3}, []float32{1, 1}, false, 0},
+		{"single", []float32{2}, []float32{1}, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			metric := metrics.NewRegression()
+			if err := metric.Update(tc.predictions, tc.targets); err != nil {
+				t.Fatal(err)
+			}
+
+			result, err := metric.Result()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			encoded, err := json.Marshal(result)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var decoded struct {
+				Count          uint64
+				MAE, MSE, RMSE float64
+				R2             *float64
+				R2Valid        bool
+			}
+			if err := json.Unmarshal(encoded, &decoded); err != nil {
+				t.Fatal(err)
+			}
+
+			if decoded.Count != result.Count || decoded.MAE != result.MAE || decoded.MSE != result.MSE || decoded.RMSE != result.RMSE || decoded.R2Valid != tc.valid {
+				t.Fatal("changed report fields", string(encoded))
+			}
+
+			if tc.valid {
+				if decoded.R2 == nil || *decoded.R2 != tc.r2 || result.R2 != tc.r2 {
+					t.Fatal(string(encoded), result)
+				}
+			} else if decoded.R2 != nil || !math.IsNaN(result.R2) || !bytes.Contains(encoded, []byte(`"R2":null`)) {
+				t.Fatal("undefined R2 must remain NaN in Go and null in JSON", string(encoded), result)
+			}
+		})
+	}
+}
+
+func TestRegressionResult_JSONRejectsOtherNonfiniteFields(t *testing.T) {
+	for _, result := range []metrics.RegressionResult{
+		{Count: 1, MSE: math.Inf(1)},
+		{Count: 1, MAE: math.NaN()},
+		{Count: 2, R2Valid: true, R2: math.NaN()},
+	} {
+		if _, err := json.Marshal(result); err == nil {
+			t.Fatal("invalid finite metric marked serializable", result)
 		}
 	}
 }

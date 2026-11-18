@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 )
@@ -31,6 +32,23 @@ type RegressionResult struct {
 	Count              uint64
 	MAE, MSE, RMSE, R2 float64
 	R2Valid            bool
+}
+
+// MarshalJSON preserves the existing field names and emits R2 as null when
+// R2Valid is false. The Go value remains unchanged, including its undefined NaN.
+// Other nonfinite fields, or a nonfinite R2 marked valid, still return JSON errors.
+func (r RegressionResult) MarshalJSON() ([]byte, error) {
+	type report RegressionResult
+
+	var r2 *float64
+	if r.R2Valid {
+		r2 = &r.R2
+	}
+
+	return json.Marshal(struct {
+		report
+		R2 *float64
+	}{report: report(r), R2: r2})
 }
 
 // NewRegression constructs an empty, reusable accumulator without external state.
