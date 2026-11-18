@@ -29,3 +29,13 @@ func TestTrainer_WebGPUParityConvergenceAndStableMemory(t *testing.T) {
 
 	checkTrainerDevice(t, device, func() (uint64, uint64) { stats := device.Stats(); return stats.LiveBytes, stats.PeakBytes })
 }
+
+func BenchmarkLossReadback_Webgpu(b *testing.B) {
+	device, err := webgpu.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = device.Close() }()
+
+	benchmarkLossReadback(b, device, func() uint64 { return device.Stats().LiveBytes })
+}

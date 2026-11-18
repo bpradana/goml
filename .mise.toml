@@ -875,7 +875,7 @@ run = "go run ./metrics/examples/classification"
 run = "go run ./metrics/examples/regression"
 
 [tasks."example:trainer"]
-run = [{ task = "example:trainer:classification" }, { task = "example:trainer:regression" }, { task = "example:trainer:custom" }]
+run = [{ task = "example:trainer:classification" }, { task = "example:trainer:regression" }, { task = "example:trainer:custom" }, { task = "example:trainer:objective" }]
 
 [tasks."example:trainer:classification"]
 run = "go run ./trainer/examples/classification"
@@ -935,3 +935,18 @@ run = [
   "GOOS=linux GOARCH=arm64 go build ./metrics/... ./trainer/...",
   "GOOS=windows GOARCH=amd64 go build ./metrics/... ./trainer/..."
 ]
+
+[tasks."example:trainer:objective"]
+run = "go run ./trainer/examples/objective"
+
+[tasks."bench:trainer:readback:cpu"]
+dir = "nn/examples/mnist"
+run = "go test -run '^$' -bench='^BenchmarkLossReadback_CPU$' -benchmem -benchtime=5x -count=3"
+
+[tasks."bench:trainer:readback:metal"]
+dir = "nn/examples/mnist"
+run = "go test -tags metal -run '^$' -bench='^BenchmarkLossReadback_Metal$' -benchmem -benchtime=5x -count=3"
+
+[tasks."bench:trainer:readback:webgpu"]
+dir = "nn/examples/mnist"
+run = "go test -tags webgpu -run '^$' -bench='^BenchmarkLossReadback_Webgpu$' -benchmem -benchtime=5x -count=3"

@@ -139,3 +139,13 @@ func TestTrainer_MetalParityConvergenceAndStableMemory(t *testing.T) {
 
 	checkTrainerDevice(t, device, func() (uint64, uint64) { stats := device.Stats(); return stats.LiveBytes, stats.PeakBytes })
 }
+
+func BenchmarkLossReadback_Metal(b *testing.B) {
+	device, err := metal.Open()
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() { _ = device.Close() }()
+
+	benchmarkLossReadback(b, device, func() uint64 { return device.Stats().LiveBytes })
+}

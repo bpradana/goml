@@ -4,6 +4,8 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"math"
 	"math/rand/v2"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bpradana/goml/tensor/backendtest"
 
@@ -18,6 +21,7 @@ import (
 	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/nn/layer"
+	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
 	"github.com/bpradana/goml/tensor/backend"
@@ -312,8 +316,8 @@ func checkTrainerDevice(t *testing.T, device backend.Device, memory func() (uint
 
 				co, _ := optimizer.NewSGD(cpu.Parameters(), 0.1)
 				go_, _ := optimizer.NewSGD(gpu.Parameters(), 0.1)
-				cr, _ := trainer.NewClassifier(cpu, co, tensor.CPU(), 2)
-				gr, _ := trainer.NewClassifier(gpu, go_, device, 2)
+				cr, _ := trainer.NewClassifierWithConfig(cpu, co, tensor.CPU(), trainer.ClassifierConfig{Classes: 2, Loss: scaledObjective[[]int]{loss.NewCrossEntropy()}})
+				gr, _ := trainer.NewClassifierWithConfig(gpu, go_, device, trainer.ClassifierConfig{Classes: 2, Loss: scaledObjective[[]int]{loss.NewCrossEntropy()}})
 
 				expected, err = cr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 20})
 				if err != nil {
@@ -350,8 +354,8 @@ func checkTrainerDevice(t *testing.T, device backend.Device, memory func() (uint
 
 				defer func() { _ = co.Close(); _ = go_.Close() }()
 
-				cr, _ := trainer.NewRegressor(cpu, co, tensor.CPU())
-				gr, _ := trainer.NewRegressor(gpu, go_, device)
+				cr, _ := trainer.NewRegressorWithConfig(cpu, co, tensor.CPU(), trainer.RegressorConfig{Loss: scaledObjective[*nn.Value]{loss.NewMSE()}})
+				gr, _ := trainer.NewRegressorWithConfig(gpu, go_, device, trainer.RegressorConfig{Loss: scaledObjective[*nn.Value]{loss.NewMSE()}})
 
 				expected, err = cr.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 100})
 				if err != nil {
@@ -392,4 +396,290 @@ func checkTrainerDevice(t *testing.T, device backend.Device, memory func() (uint
 	if live, _ := memory(); live != 0 {
 		t.Fatalf("model/optimizer cleanup left %d bytes", live)
 	}
+}
+
+// scaledObjective exercises the same configured objective on CPU and native
+// backends. It adds no host reads and preserves inference/autograd behavior.
+type scaledObjective[T any] struct{ loss.Loss[T] }
+
+func (s scaledObjective[T]) Forward(prediction *nn.Value, target T) (*nn.Value, error) {
+	objective, err := s.Loss.Forward(prediction, target)
+	if err != nil {
+		return nil, err
+	}
+
+	return nn.Scale(objective, 1)
+}
+
+func BenchmarkLossReadback_CPU(b *testing.B) {
+	benchmarkLossReadback(b, tensor.CPU(), func() uint64 { return 0 })
+}
+
+func benchmarkLossReadback(b *testing.B, device backend.Device, liveBytes func() uint64) {
+	values := make([]float32, 256*64)
+	for i := range values {
+		values[i] = float32(i%17-8) / 8
+	}
+
+	inputs, err := tensor.From(values, 256, 64)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() { _ = inputs.Close() }()
+
+	labels := make([]int, 256)
+	for i := range labels {
+		labels[i] = i % 10
+	}
+
+	dataset, err := data.NewClassificationDataset(inputs, labels)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	loader, err := data.NewLoader(dataset, data.CollateClassification, data.LoaderOptions{BatchSize: 32})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	control, controlOptimizer := newReadbackModel(b, device)
+
+	controlRunner, err := trainer.NewClassifier(control, controlOptimizer, device, 10)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	controlHistory, err := controlRunner.Fit(context.Background(), loader, nil, trainer.FitOptions{Epochs: 1})
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	expectedLoss := controlHistory.Epochs[0].Train.MeanLoss
+
+	expectedWeights, err := control.Parameters()[0].Value().Data().HostData()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	controlOptimizer.ZeroGrad()
+
+	for _, parameter := range control.Parameters() {
+		_ = parameter.Value().Data().Close()
+	}
+
+	if err := device.Synchronize(); err != nil {
+		b.Fatal(err)
+	}
+
+	for _, mode := range []string{"Trainer", "ManualBatchRead", "ManualEpochRead"} {
+		b.Run(mode, func(b *testing.B) {
+			var (
+				readback, synchronization time.Duration
+				peakLive                  uint64
+			)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+
+			for range b.N {
+				b.StopTimer()
+
+				model, opt := newReadbackModel(b, device)
+
+				runner, err := trainer.NewClassifier(model, opt, device, 10)
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				b.StartTimer()
+
+				var mean float64
+
+				if mode == "Trainer" {
+					history, err := runner.Fit(context.Background(), loader, nil, trainer.FitOptions{Epochs: 1})
+					if err != nil {
+						b.Fatal(err)
+					}
+
+					mean = history.Epochs[0].Train.MeanLoss
+					peakLive = max(peakLive, liveBytes())
+				} else {
+					var saved []*tensor.Tensor
+
+					for batch, err := range loader.Batches(context.Background(), 0) {
+						if err != nil {
+							b.Fatal(err)
+						}
+
+						value, retained, duration, err := readbackBatch(model, opt, device, batch, mode == "ManualEpochRead")
+						if err != nil {
+							b.Fatal(err)
+						}
+
+						readback += duration
+						mean += value / 8
+
+						if retained != nil {
+							saved = append(saved, retained)
+						}
+
+						peakLive = max(peakLive, liveBytes())
+					}
+
+					for _, scalar := range saved {
+						start := time.Now()
+						values, err := scalar.HostData()
+						readback += time.Since(start)
+						_ = scalar.Close()
+
+						if err != nil || len(values) != 1 || math.IsNaN(float64(values[0])) || math.IsInf(float64(values[0]), 0) {
+							b.Fatal("invalid deferred loss", values, err)
+						}
+
+						mean += float64(values[0]) / 8
+					}
+				}
+
+				start := time.Now()
+
+				if err := device.Synchronize(); err != nil {
+					b.Fatal(err)
+				}
+
+				synchronization += time.Since(start)
+
+				b.StopTimer()
+
+				weights, err := model.Parameters()[0].Value().Data().HostData()
+				if err != nil {
+					b.Fatal(err)
+				}
+
+				if math.Abs(mean-expectedLoss) > 1e-6 {
+					b.Fatal("loss parity", mean, expectedLoss)
+				}
+
+				for i, weight := range weights {
+					if math.Abs(float64(weight-expectedWeights[i])) > 1e-6 {
+						b.Fatal("weight parity", i)
+					}
+				}
+
+				opt.ZeroGrad()
+
+				for _, parameter := range model.Parameters() {
+					_ = parameter.Value().Data().Close()
+				}
+
+				if err := device.Synchronize(); err != nil {
+					b.Fatal(err)
+				}
+
+				if liveBytes() != 0 {
+					b.Fatal("live allocation after epoch cleanup", liveBytes())
+				}
+
+				b.StartTimer()
+			}
+
+			b.ReportMetric(float64(synchronization.Nanoseconds())/float64(b.N), "final-sync-ns/epoch")
+			b.ReportMetric(float64(peakLive), "sampled-live-B")
+			b.ReportMetric(256*float64(b.N)/b.Elapsed().Seconds(), "samples/s")
+
+			if mode != "Trainer" {
+				b.ReportMetric(float64(readback.Nanoseconds())/float64(b.N), "readback-ns/epoch")
+			}
+		})
+	}
+}
+
+// readbackBatch is a benchmark-only control. Deferred readback detects nonfinite
+// loss after updates, so it is not a production alternative to Trainer's checks.
+func readbackBatch(model *layer.Sequential, opt optimizer.Optimizer, device backend.Device, batch *data.ClassificationBatch, deferred bool) (value float64, saved *tensor.Tensor, readTime time.Duration, err error) {
+	defer func() { err = errors.Join(err, batch.Close()) }()
+
+	opt.ZeroGrad()
+	defer opt.ZeroGrad()
+
+	scope, err := tensor.NewScope(device)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	defer func() { err = errors.Join(err, scope.Close()) }()
+
+	input, err := scope.To(batch.Inputs)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	inputValue, err := nn.NewValue(input, false)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	prediction, err := model.Forward(inputValue)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	objective, err := loss.NewCrossEntropy().Forward(prediction, batch.Labels)
+	if err != nil {
+		return 0, nil, 0, err
+	}
+
+	if !deferred {
+		start := time.Now()
+		values, err := objective.Data().HostData()
+
+		readTime = time.Since(start)
+		if err != nil {
+			return 0, nil, readTime, err
+		}
+
+		value = float64(values[0])
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return 0, nil, readTime, fmt.Errorf("invalid scalar loss")
+		}
+	}
+
+	if err := objective.Backward(); err != nil {
+		return 0, nil, readTime, err
+	}
+
+	if err := opt.Step(); err != nil {
+		return 0, nil, readTime, err
+	}
+
+	if deferred {
+		saved, err = objective.Data().Retain()
+	}
+
+	return value, saved, readTime, err
+}
+
+func newReadbackModel(b testing.TB, device backend.Device) (*layer.Sequential, *optimizer.SGD) {
+	b.Helper()
+
+	dense, err := layer.NewDense(64, 10, true, rand.New(rand.NewPCG(1, 2)))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	model, err := layer.NewSequential(dense)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	if err := nn.ToDevice(model.Parameters(), device); err != nil {
+		b.Fatal(err)
+	}
+
+	opt, err := optimizer.NewSGD(model.Parameters(), 0.01)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	return model, opt
 }
