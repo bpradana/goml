@@ -5,6 +5,7 @@ import (
 
 	"github.com/bpradana/goml/data"
 	"github.com/bpradana/goml/metrics"
+	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/tensor/backend"
 )
 
@@ -15,7 +16,7 @@ func EvaluateClassification(ctx context.Context, model Model, device backend.Dev
 		return Evaluation{}, err
 	}
 
-	runner := Classifier{model: model, device: device, classes: classes, metrics: extraMetrics}
+	runner := Classifier{model: model, device: device, classes: classes, objective: loss.NewCrossEntropy(), metrics: extraMetrics}
 
 	return runner.evaluate(ctx, source, 0)
 }
@@ -27,7 +28,7 @@ func EvaluateRegression(ctx context.Context, model Model, device backend.Device,
 		return Evaluation{}, err
 	}
 
-	runner := Regressor{model: model, device: device, metrics: extraMetrics}
+	runner := Regressor{objective: loss.NewMSE(), model: model, device: device, metrics: extraMetrics}
 
 	return runner.evaluate(ctx, source, 0)
 }

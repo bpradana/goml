@@ -28,20 +28,20 @@ type FitOptions struct {
 	OnEpochEnd         func(EpochReport) error
 	EarlyStopping      *EarlyStopping
 	BestCheckpointPath string
+	// SaveBest overrides model serialization. It is synchronous, borrows the
+	// model, and owns atomic writing/file integrity. A path and validation are
+	// required. It must not close the model or other caller-owned resources.
+	SaveBest func(path string) error
 }
 
 // Fit orchestrates arbitrary typed steps without a model/task hierarchy. Steps
 // own batch cleanup and all numerical behavior. Evaluation uses evaluateStep with
 // its own application-owned typed accumulator if desired. Built-in classifier /
 // regressor methods additionally attach metric snapshots and model checkpoints.
-// Generic Fit rejects BestCheckpointPath: custom applications save in callbacks.
+// Generic Fit requires SaveBest when BestCheckpointPath is configured.
 func Fit[B any](ctx context.Context, train, validation BatchSource[B], trainStep, evaluateStep StepFunc[B], options FitOptions) (History, error) {
 	if train == nil || trainStep == nil || (validation != nil && evaluateStep == nil) {
 		return History{}, fmt.Errorf("trainer: batch source and matching step functions required")
-	}
-
-	if options.BestCheckpointPath != "" {
-		return History{}, fmt.Errorf("trainer: custom Fit: save custom checkpoints in OnEpochEnd")
 	}
 
 	var evaluate func(int) (Evaluation, error)
@@ -96,6 +96,18 @@ func fit(ctx context.Context, options FitOptions, train func(int) (EpochStats, e
 	var history History
 	if options.Epochs <= 0 {
 		return history, fmt.Errorf("trainer: epochs must be positive")
+	}
+
+	if options.SaveBest != nil {
+		if options.BestCheckpointPath == "" {
+			return history, fmt.Errorf("trainer: SaveBest requires BestCheckpointPath")
+		}
+
+		save = options.SaveBest
+	}
+
+	if options.BestCheckpointPath != "" && save == nil {
+		return history, fmt.Errorf("trainer: BestCheckpointPath requires SaveBest for custom Fit")
 	}
 
 	if (options.EarlyStopping != nil || options.BestCheckpointPath != "") && evaluate == nil {

@@ -2,6 +2,7 @@ package trainer_test
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/bpradana/goml/data"
 	"github.com/bpradana/goml/nn/checkpoint"
 	"github.com/bpradana/goml/nn/layer"
+	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
 	"github.com/bpradana/goml/trainer"
 )
@@ -121,3 +123,132 @@ func TestCheckpoint_UnsupportedArchitecturePreservesExistingFile(t *testing.T) {
 }
 
 var _ trainer.Model = (*layer.Sequential)(nil)
+
+func TestCheckpoint_CustomSaverAndGenericFitSelectOnlyStrictImprovements(t *testing.T) {
+	losses := []float64{1, 1, 0.5, 0.75}
+	epoch, saves, callbacks := 0, 0, 0
+
+	var events []string
+
+	train := func(context.Context, int) (trainer.StepResult, error) {
+		return trainer.StepResult{MeanLoss: 1, Samples: 1}, nil
+	}
+	evaluate := func(context.Context, int) (trainer.StepResult, error) {
+		value := losses[epoch]
+		epoch++
+
+		return trainer.StepResult{MeanLoss: value, Samples: 1}, nil
+	}
+	options := trainer.FitOptions{
+		Epochs:             4,
+		BestCheckpointPath: "application-owned.bin",
+		SaveBest: func(path string) error {
+			if path != "application-owned.bin" {
+				t.Fatal(path)
+			}
+
+			saves++
+
+			events = append(events, "save")
+
+			return nil
+		},
+		OnEpochEnd: func(trainer.EpochReport) error {
+			callbacks++
+
+			events = append(events, "report")
+
+			return nil
+		},
+	}
+
+	history, err := trainer.Fit(context.Background(), numberSource{1}, numberSource{1}, train, evaluate, options)
+	if err != nil || len(history.Epochs) != 4 || saves != 2 || callbacks != 4 || !slices.Equal(events, []string{"save", "report", "report", "save", "report", "report"}) {
+		t.Fatal(history, err, events)
+	}
+}
+
+func TestCheckpoint_CustomSaverOverridesSequentialCodecAndPropagatesFailure(t *testing.T) {
+	base := denseModel(t, 1, 1)
+
+	model, err := layer.NewSequential(customDense{Layer: base})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opt, err := optimizer.NewSGD(base.Parameters(), 0.01)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runner, err := trainer.NewRegressor(model, opt, tensor.CPU())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wanted := errors.New("custom save failed")
+	saves, callbacks := 0, 0
+	options := trainer.FitOptions{
+		Epochs:             1,
+		BestCheckpointPath: "custom.bin",
+		SaveBest:           func(string) error { saves++; return wanted },
+		OnEpochEnd:         func(trainer.EpochReport) error { callbacks++; return nil },
+	}
+	loader := regressionLoader(t)
+
+	history, err := runner.Fit(context.Background(), loader, loader, options)
+	if !errors.Is(err, wanted) || saves != 1 || callbacks != 0 || len(history.Epochs) != 1 {
+		t.Fatal(history, err, saves, callbacks)
+	}
+
+	options.SaveBest = func(string) error { saves++; return nil }
+	if _, err := runner.Fit(context.Background(), loader, loader, options); err != nil || saves != 2 || callbacks != 1 {
+		t.Fatal(err, saves, callbacks)
+	}
+
+	for _, parameter := range model.Parameters() {
+		if parameter.Value().Data().IsClosed() {
+			t.Fatal("custom checkpoint closed model")
+		}
+	}
+}
+
+func TestCheckpoint_InvalidSaveBestConfiguration(t *testing.T) {
+	step := func(context.Context, int) (trainer.StepResult, error) {
+		return trainer.StepResult{MeanLoss: 1, Samples: 1}, nil
+	}
+	for _, options := range []trainer.FitOptions{
+		{Epochs: 1, SaveBest: func(string) error { return nil }},
+		{Epochs: 1, BestCheckpointPath: "missing-saver"},
+	} {
+		if _, err := trainer.Fit(context.Background(), numberSource{1}, numberSource{1}, step, step, options); err == nil {
+			t.Fatal("invalid saver configuration accepted")
+		}
+	}
+
+	if _, err := trainer.Fit(context.Background(), numberSource{1}, nil, step, nil, trainer.FitOptions{Epochs: 1, BestCheckpointPath: "path", SaveBest: func(string) error { return nil }}); err == nil {
+		t.Fatal("checkpoint without validation accepted")
+	}
+}
+
+type weightsOnlyModel struct{ trainer.Model }
+
+func TestCheckpoint_NonSequentialModelStillSavesWeights(t *testing.T) {
+	model := denseModel(t, 1, 1)
+
+	runner, err := trainer.NewRegressor(weightsOnlyModel{model}, &scriptedOptimizer{model: model}, tensor.CPU())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	path := filepath.Join(t.TempDir(), "weights.goml")
+
+	loader := regressionLoader(t)
+	if _, err := runner.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 1, BestCheckpointPath: path}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := checkpoint.LoadWeights(path, model.Parameters()); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -76,9 +76,33 @@ func run() error {
 		return err
 	}
 
-	history, err := runner.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 100})
+	// Custom metric history belongs to the application and keeps its concrete type.
+	type biasEpoch struct {
+		Epoch  int
+		Result meanbias.Result
+	}
+
+	var biasHistory []biasEpoch
+
+	history, err := runner.Fit(context.Background(), loader, loader, trainer.FitOptions{
+		Epochs: 100,
+		OnEpochEnd: func(report trainer.EpochReport) error {
+			result, err := bias.Result()
+			if err != nil {
+				return err
+			}
+
+			biasHistory = append(biasHistory, biasEpoch{Epoch: report.Epoch, Result: result})
+
+			return nil
+		},
+	})
 	if err != nil {
 		return err
+	}
+
+	if len(biasHistory) != len(history.Epochs) {
+		return fmt.Errorf("missing typed metric report")
 	}
 
 	last := history.Epochs[len(history.Epochs)-1]

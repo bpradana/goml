@@ -15,10 +15,19 @@ import (
 	"github.com/bpradana/goml/tensor/backend"
 )
 
-// Regressor trains fixed-shape numerical outputs with mean squared error.
+// RegressorConfig selects a differentiable sample-mean loss. Nil uses MSE.
+// For fixed-size multi-output targets, reduce outputs within each sample and
+// then average samples. Training/validation share this objective. Return an owned
+// scalar on the selected device, propagate scopes, and preserve dependencies.
+type RegressorConfig struct {
+	Loss loss.Loss[*nn.Value]
+}
+
+// Regressor trains fixed-shape numerical outputs, defaulting to mean squared error.
 // Epoch loss weights samples; metrics flatten output scalars equally. Model,
 // optimizer, and device are borrowed. Outputs and targets must match exactly.
 type Regressor struct {
+	objective loss.Loss[*nn.Value]
 	model     Model
 	optimizer optimizer.Optimizer
 	device    backend.Device
@@ -30,6 +39,13 @@ type Regressor struct {
 // Extra metrics receive flattened predictions/targets during evaluation. They
 // reset per evaluation; their concrete typed results remain application-owned.
 func NewRegressor(model Model, opt optimizer.Optimizer, device backend.Device, extraMetrics ...metrics.Accumulator[float32, float32]) (*Regressor, error) {
+	return NewRegressorWithConfig(model, opt, device, RegressorConfig{}, extraMetrics...)
+}
+
+// NewRegressorWithConfig accepts a custom mean loss without replacing batch
+// ownership, backward, or optimizer handling. Validation/early stopping monitor
+// this same objective; the reported regression metrics retain their definitions.
+func NewRegressorWithConfig(model Model, opt optimizer.Optimizer, device backend.Device, config RegressorConfig, extraMetrics ...metrics.Accumulator[float32, float32]) (*Regressor, error) {
 	if err := validateModel(model, device); err != nil {
 		return nil, err
 	}
@@ -44,7 +60,11 @@ func NewRegressor(model Model, opt optimizer.Optimizer, device backend.Device, e
 		}
 	}
 
-	return &Regressor{model: model, optimizer: opt, device: device, metrics: slices.Clone(extraMetrics)}, nil
+	if config.Loss == nil {
+		config.Loss = loss.NewMSE()
+	}
+
+	return &Regressor{model: model, objective: config.Loss, optimizer: opt, device: device, metrics: slices.Clone(extraMetrics)}, nil
 }
 
 // Fit owns only iteration temporaries and yielded batches. Completed reports
@@ -174,11 +194,22 @@ func (r *Regressor) batch(ctx context.Context, batch *data.RegressionBatch, trai
 		return result, err
 	}
 
-	objective, err := loss.NewMSE().Forward(prediction, targetValue)
+	objective, err := r.objective.Forward(prediction, targetValue)
+	if objective != nil && objective.Data() != nil {
+		defer func() { err = errors.Join(err, objective.Data().Close()) }()
+	}
+
 	if err != nil {
 		return result, err
 	}
-	defer func() { err = errors.Join(err, objective.Data().Close()) }()
+
+	if objective == nil {
+		return result, fmt.Errorf("trainer: loss returned nil")
+	}
+
+	if err := validateOutput(objective.Data(), r.device); err != nil {
+		return result, fmt.Errorf("trainer: loss: %w", err)
+	}
 
 	mean, err := scalarLoss(objective)
 	if err != nil {

@@ -4,12 +4,15 @@ import (
 	"context"
 	"errors"
 	"iter"
+	"math"
 	"math/rand/v2"
 	"slices"
 	"testing"
 
 	"github.com/bpradana/goml/data"
+	"github.com/bpradana/goml/nn"
 	"github.com/bpradana/goml/nn/layer"
+	"github.com/bpradana/goml/nn/loss"
 	"github.com/bpradana/goml/nn/optimizer"
 	"github.com/bpradana/goml/tensor"
 	"github.com/bpradana/goml/trainer"
@@ -275,6 +278,142 @@ func BenchmarkClassifier_Epoch(b *testing.B) {
 
 				if err != nil {
 					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+type classificationLossFunc func(*nn.Value, []int) (*nn.Value, error)
+
+func (f classificationLossFunc) Forward(prediction *nn.Value, targets []int) (*nn.Value, error) {
+	return f(prediction, targets)
+}
+
+func TestClassifier_ConfiguredLossUsedForTrainingAndValidation(t *testing.T) {
+	model := denseModel(t, 1, 2)
+
+	sgd, err := optimizer.NewSGD(model.Parameters(), 0.1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	opt := &countingOptimizer{Optimizer: sgd}
+	calls, targetCount := 0, 0
+	custom := classificationLossFunc(func(prediction *nn.Value, targets []int) (*nn.Value, error) {
+		calls++
+
+		targetCount += len(targets)
+		for _, target := range targets {
+			if target < 0 || target > 1 {
+				t.Fatal("wrong target", target)
+			}
+		}
+
+		value, err := loss.NewCrossEntropy().Forward(prediction, targets)
+		if err != nil {
+			return nil, err
+		}
+
+		return nn.Scale(value, 2)
+	})
+
+	runner, err := trainer.NewClassifierWithConfig(model, opt, tensor.CPU(), trainer.ClassifierConfig{Classes: 2, Loss: custom})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loader := classLoader(t, 3)
+
+	before, err := trainer.EvaluateClassification(context.Background(), model, tensor.CPU(), 2, loader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	configured, err := runner.Evaluate(context.Background(), loader)
+	if err != nil || math.Abs(configured.MeanLoss-2*before.MeanLoss) > 1e-6 {
+		t.Fatal(configured, before, err)
+	}
+
+	calls, targetCount = 0, 0
+	weights, _ := model.Parameters()[0].Value().Data().HostData()
+
+	history, err := runner.Fit(context.Background(), loader, loader, trainer.FitOptions{Epochs: 1})
+	if err != nil || len(history.Epochs) != 1 || calls != 4 || targetCount != 8 || opt.steps != 2 {
+		t.Fatal(history, err, calls, targetCount, opt.steps)
+	}
+
+	after, _ := model.Parameters()[0].Value().Data().HostData()
+	if slices.Equal(weights, after) {
+		t.Fatal("custom loss lost the backward dependency")
+	}
+
+	standard, err := trainer.EvaluateClassification(context.Background(), model, tensor.CPU(), 2, loader)
+	if err != nil || math.Abs(history.Epochs[0].Validation.MeanLoss-2*standard.MeanLoss) > 1e-6 {
+		t.Fatal(history, standard, err)
+	}
+}
+
+func TestClassifier_ConfiguredLossFailuresCloseResourcesAndDoNotStep(t *testing.T) {
+	for _, kind := range []string{"error", "nil", "vector", "nan", "infinity", "backward"} {
+		t.Run(kind, func(t *testing.T) {
+			model := denseModel(t, 1, 2)
+			sgd, _ := optimizer.NewSGD(model.Parameters(), 0.1)
+			opt := &countingOptimizer{Optimizer: sgd}
+			wanted := errors.New("custom loss failure")
+
+			var temporary *tensor.Tensor
+
+			custom := classificationLossFunc(func(prediction *nn.Value, targets []int) (*nn.Value, error) {
+				if kind == "nil" {
+					return nil, nil
+				}
+
+				if kind == "vector" {
+					temporary = prediction.Data()
+					return prediction, nil
+				}
+
+				objective, err := loss.NewCrossEntropy().Forward(prediction, targets)
+				if err != nil {
+					return nil, err
+				}
+
+				temporary = objective.Data()
+
+				switch kind {
+				case "error":
+					return objective, wanted
+				case "nan":
+					return nn.Scale(objective, float32(math.NaN()))
+				case "infinity":
+					return nn.Scale(objective, float32(math.Inf(1)))
+				case "backward":
+					return nn.NewOperation(objective.Data(), objective, func(*tensor.Tensor) (*tensor.Tensor, error) { return nil, wanted })
+				default:
+					return objective, nil
+				}
+			})
+
+			runner, err := trainer.NewClassifierWithConfig(model, opt, tensor.CPU(), trainer.ClassifierConfig{Classes: 2, Loss: custom})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			source := &observedClasses{source: classLoader(t, 3)}
+
+			_, err = runner.Fit(context.Background(), source, nil, trainer.FitOptions{Epochs: 1})
+			if err == nil || opt.steps != 0 || ((kind == "error" || kind == "backward") && !errors.Is(err, wanted)) {
+				t.Fatal(err, opt.steps)
+			}
+
+			if len(source.batches) != 1 || !source.batches[0].Inputs.IsClosed() || (temporary != nil && !temporary.IsClosed()) {
+				t.Fatal("loss failure leaked batch or temporary")
+			}
+
+			for _, parameter := range model.Parameters() {
+				if parameter.Value().Grad() != nil || parameter.Value().Data().IsClosed() {
+					t.Fatal("loss failure retained gradients or closed model")
 				}
 			}
 		})

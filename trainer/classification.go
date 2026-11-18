@@ -14,13 +14,23 @@ import (
 	"github.com/bpradana/goml/tensor/backend"
 )
 
-// Classifier trains with stable mean cross-entropy from logits and evaluates
+// ClassifierConfig selects the class count and a mean differentiable objective.
+// A nil Loss uses cross-entropy. Training and validation use the same loss.
+// Loss outputs must be owned scalar handles on the selected device and preserve
+// scopes/autograd. Custom losses must not mutate parameters or retain targets.
+type ClassifierConfig struct {
+	Classes int
+	Loss    loss.Loss[[]int]
+}
+
+// Classifier defaults to stable mean cross-entropy from logits and evaluates
 // streaming classification metrics. Dependencies are borrowed, never closed or
 // moved. Place parameters before constructing the optimizer and this runner.
 type Classifier struct {
 	model     Model
 	optimizer optimizer.Optimizer
 	device    backend.Device
+	objective loss.Loss[[]int]
 	classes   int
 	metrics   []metrics.Accumulator[float32, int]
 }
@@ -30,6 +40,15 @@ type Classifier struct {
 // Extra metrics receive raw [samples,classes] logits during evaluation and are
 // reset once per evaluation. Read their typed Result in OnEpochEnd or afterward.
 func NewClassifier(model Model, opt optimizer.Optimizer, device backend.Device, classes int, extraMetrics ...metrics.Accumulator[float32, int]) (*Classifier, error) {
+	return NewClassifierWithConfig(model, opt, device, ClassifierConfig{Classes: classes}, extraMetrics...)
+}
+
+// NewClassifierWithConfig accepts an application loss through nn/loss.Loss.
+// Nil loss preserves the default. Validation and model selection monitor this
+// same sample-mean objective, while classification metrics remain unchanged.
+func NewClassifierWithConfig(model Model, opt optimizer.Optimizer, device backend.Device, config ClassifierConfig, extraMetrics ...metrics.Accumulator[float32, int]) (*Classifier, error) {
+	classes := config.Classes
+
 	if err := validateModel(model, device); err != nil {
 		return nil, err
 	}
@@ -44,7 +63,11 @@ func NewClassifier(model Model, opt optimizer.Optimizer, device backend.Device, 
 		}
 	}
 
-	return &Classifier{model: model, optimizer: opt, device: device, classes: classes, metrics: slices.Clone(extraMetrics)}, nil
+	if config.Loss == nil {
+		config.Loss = loss.NewCrossEntropy()
+	}
+
+	return &Classifier{model: model, optimizer: opt, device: device, classes: classes, objective: config.Loss, metrics: slices.Clone(extraMetrics)}, nil
 }
 
 // Fit runs zero-based loader epochs and returns one-based completed reports.
@@ -163,11 +186,22 @@ func (r *Classifier) batch(ctx context.Context, batch *data.ClassificationBatch,
 		return result, fmt.Errorf("trainer: expected logits [%d,%d], got %v", len(batch.Labels), r.classes, shape)
 	}
 
-	objective, err := loss.NewCrossEntropy().Forward(prediction, batch.Labels)
+	objective, err := r.objective.Forward(prediction, batch.Labels)
+	if objective != nil && objective.Data() != nil {
+		defer func() { err = errors.Join(err, objective.Data().Close()) }()
+	}
+
 	if err != nil {
 		return result, err
 	}
-	defer func() { err = errors.Join(err, objective.Data().Close()) }()
+
+	if objective == nil {
+		return result, fmt.Errorf("trainer: loss returned nil")
+	}
+
+	if err := validateOutput(objective.Data(), r.device); err != nil {
+		return result, fmt.Errorf("trainer: loss: %w", err)
+	}
 
 	mean, err := scalarLoss(objective)
 	if err != nil {
